@@ -1,8 +1,9 @@
 {
   "date": "2026-11-16",
-  "timestamp": "2026-11-16T08:58:27+00:00",
+  "timestamp": "2026-11-16T09:04:39+00:00",
   "environment": "kind-on-mac",
-  "git_sha": "cd69f35",
+  "git_sha": "96b686a",
+  "git_dirty": false,
   "kubernetes_version": "v1.36.4",
   "container_runtime": "containerd://2.3.4",
   "node_os": "Debian GNU/Linux 13 (trixie)",
@@ -29,31 +30,31 @@
         "succeeded": 200
       },
       "infra_error_ratio": 0.0,
-      "wall_seconds": 180.4,
-      "throughput_runs_per_second": 1.109,
+      "wall_seconds": 181.0,
+      "throughput_runs_per_second": 1.105,
       "queue_wait_seconds": {
-        "p50": 1.193,
-        "p95": 2.741,
-        "p99": 3.038,
-        "max": 3.948
+        "p50": 1.197,
+        "p95": 2.296,
+        "p99": 2.762,
+        "max": 4.121
       },
       "schedule_seconds": {
-        "p50": 0.085,
-        "p95": 0.594,
-        "p99": 0.807,
-        "max": 0.883
+        "p50": 0.09,
+        "p95": 0.62,
+        "p99": 0.781,
+        "max": 0.799
       },
       "exec_seconds": {
-        "p50": 2.88,
-        "p95": 3.587,
-        "p99": 3.728,
-        "max": 3.977
+        "p50": 2.868,
+        "p95": 3.598,
+        "p99": 3.939,
+        "max": 4.047
       },
       "e2e_seconds": {
-        "p50": 4.293,
-        "p95": 5.478,
-        "p99": 6.187,
-        "max": 6.576
+        "p50": 4.282,
+        "p95": 5.462,
+        "p99": 5.852,
+        "max": 7.657
       }
     },
     {
@@ -63,31 +64,31 @@
         "succeeded": 200
       },
       "infra_error_ratio": 0.0,
-      "wall_seconds": 157.8,
-      "throughput_runs_per_second": 1.267,
+      "wall_seconds": 168.4,
+      "throughput_runs_per_second": 1.187,
       "queue_wait_seconds": {
-        "p50": 12.243,
-        "p95": 13.935,
-        "p99": 14.437,
-        "max": 14.786
+        "p50": 13.03,
+        "p95": 15.026,
+        "p99": 15.562,
+        "max": 15.707
       },
       "schedule_seconds": {
-        "p50": 0.261,
-        "p95": 0.749,
-        "p99": 0.993,
-        "max": 1.02
+        "p50": 0.285,
+        "p95": 0.786,
+        "p99": 0.887,
+        "max": 1.37
       },
       "exec_seconds": {
-        "p50": 2.595,
-        "p95": 3.362,
-        "p99": 3.516,
-        "max": 3.645
+        "p50": 2.852,
+        "p95": 3.52,
+        "p99": 3.901,
+        "max": 4.49
       },
       "e2e_seconds": {
-        "p50": 15.083,
-        "p95": 16.808,
-        "p99": 17.154,
-        "max": 17.87
+        "p50": 16.001,
+        "p95": 18.341,
+        "p99": 18.809,
+        "max": 19.176
       }
     }
   ],
