@@ -148,3 +148,12 @@ Requested before the first AWS session. Added `aws_orphans.sh deep` (direct quer
 `aws_force_cleanup.sh` (dry run by default, tag-scoped direct deletion), lock handling and fallback in `eks-session.yml`, hourly
 reaper with the same fallback, timeouts on every long step. `tests/unit/test_teardown.py` (13 tests, stub `aws`). Unit suite: 127 passed.
 Still unrun against AWS; the first session is the real test. Known gaps listed in docs/AWS.md.
+
+## Bootstrap applied (2026-11-16)
+Owner explicitly lifted the "never create AWS resources" rule for the bootstrap only, and ran it through their own CLI credentials.
+`infra/bootstrap` applied with `create_oidc_provider=false` (the account already had the GitHub OIDC provider): 10 resources added,
+state bucket `ksc-tfstate-<account>-us-east-1` (versioned, encrypted, public access blocked), role `ksc-ci` (trusts only this repo's
+`eks-session` environment and `main`), budget `ksc-monthly` ($25, alerts at 20/60/100% actual and 100% forecast to the owner's address).
+Repo variables `AWS_ROLE_ARN` and `TF_STATE_BUCKET` set. Bootstrap state is local (git-ignored) in `infra/bootstrap/`: keep it.
+No EKS session has been started; creating the cluster remains a manual, approved workflow run. Still to do (owner): Neon secrets,
+the `eks-session` environment with a required reviewer, public GHCR packages.
