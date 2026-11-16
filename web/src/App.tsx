@@ -3,12 +3,14 @@ import {
   type Cluster, type DataSource, type Run, type RunSummary, type Status, type StreamEvent,
   durationSeconds, isTerminal,
 } from "./api";
-import { ATTACKS, HELLO, type Attack } from "./attacks";
+import { ATTACKS, HELLO, type Attack, type Language } from "./attacks";
+import type { ReplaySource, Snapshot } from "./replay";
 
 type Line = { kind: "stdout" | "stderr" | "state"; text: string };
-type Lang = "python3.12" | "node20";
 
 const fmt = (n: number | null) => (n === null ? "–" : `${n.toFixed(1)}s`);
+const num = (n: number | null) => (n === null ? "n/a" : n.toFixed(2));
+const isReplay = (s: DataSource): s is ReplaySource => s.mode === "replay";
 
 function StatusBadge({ status }: { status: Status }) {
   return <span className={`badge s-${status}`}>{status}</span>;
@@ -48,8 +50,46 @@ function ClusterPanel({ cluster }: { cluster: Cluster | null }) {
   );
 }
 
+/** Replay mode: the measured results, straight from the recorded results file. */
+function ResultsPanel({ snap }: { snap: Snapshot }) {
+  const b = snap.benchmark;
+  if (!b) return <section className="panel"><h2>Measured results</h2><p className="muted">no benchmark recorded</p></section>;
+  const mem = b.vm?.memory_bytes ? `${Math.round(b.vm.memory_bytes / 2 ** 30)} GiB` : "n/a";
+  return (
+    <section className="panel results">
+      <h2>Measured results</h2>
+      <p className="muted">
+        {b.environment}, {b.date}, <span className="mono">{b.git_sha}</span>. Kubernetes {b.kubernetes_version},{" "}
+        {b.container_runtime}, {b.worker_nodes} workers, cap {b.concurrency_cap}, VM {b.vm?.cpus ?? "n/a"} CPU / {mem}.
+      </p>
+      <table>
+        <thead>
+          <tr><th>in flight</th><th>runs</th><th>queue p50/p95</th><th>e2e p50/p95</th><th>runs/s</th></tr>
+        </thead>
+        <tbody>
+          {b.levels.map((l) => (
+            <tr key={l.concurrency}>
+              <td>{l.concurrency}</td>
+              <td>{l.statuses.succeeded ?? 0}/{l.sample_size}</td>
+              <td>{num(l.queue_wait_seconds.p50)} / {num(l.queue_wait_seconds.p95)} s</td>
+              <td>{num(l.e2e_seconds.p50)} / {num(l.e2e_seconds.p95)} s</td>
+              <td>{l.throughput_runs_per_second}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="muted">{b.workload}</p>
+      <p className="muted">
+        Results file:{" "}
+        {snap.links.results ? <a href={snap.links.results} target="_blank" rel="noreferrer">{b.results_file}</a> : b.results_file}
+      </p>
+    </section>
+  );
+}
+
 export default function App({ source, onKeyChange }: { source: DataSource; onKeyChange?: (k: string) => void }) {
-  const [language, setLanguage] = useState<Lang>("python3.12");
+  const replay = isReplay(source) ? source : null;
+  const [language, setLanguage] = useState<Language>("python3.12");
   const [code, setCode] = useState(HELLO["python3.12"]);
   const [timeout, setTimeoutSeconds] = useState(30);
   const [expect, setExpect] = useState<string | null>(null);
@@ -75,9 +115,10 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
 
   useEffect(() => {
     void refresh();
+    if (replay) return; // recorded data does not change
     const t = setInterval(() => void refresh(), 2000);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, replay]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -90,32 +131,39 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
     setRunId(id);
     setLines([]);
     setRun(null);
+    setError(null);
+    setBusy(true);
     const onEvent = (e: StreamEvent) => {
       if (e.kind === "state") {
         setLines((l) => [...l, { kind: "state", text: `— ${e.status}` }]);
         setRun((r) => (r ? { ...r, status: e.status } : r));
-        void source.get(id).then(setRun).catch(() => undefined);
+        void source.get(id).then((r) => !ctl.signal.aborted && setRun(r)).catch(() => undefined);
       } else if (e.kind === "stdout" || e.kind === "stderr") {
         setLines((l) => [...l, { kind: e.kind, text: e.text }]);
       }
     };
     try {
-      setRun(await source.get(id));
+      const first = await source.get(id);
+      setRun(first);
+      if (first.code) {
+        setCode(first.code);
+        setLanguage(first.language as Language);
+      }
       await source.stream(id, onEvent, ctl.signal);
-      setRun(await source.get(id));
+      if (!ctl.signal.aborted) setRun(await source.get(id));
     } catch (e) {
       if (!ctl.signal.aborted) setError(String(e));
     } finally {
-      setBusy(false);
+      if (abort.current === ctl) setBusy(false);
       void refresh();
     }
   }, [source, refresh]);
 
-  const submit = async (lang: Lang, src: string, secs: number) => {
+  const submit = async () => {
     setError(null);
     setBusy(true);
     try {
-      await follow(await source.submit(lang, src, secs));
+      await follow(await source.submit(language, code, timeout));
     } catch (e) {
       setError(String(e));
       setBusy(false);
@@ -127,10 +175,14 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
     setCode(a.code);
     setTimeoutSeconds(a.timeout);
     setExpect(a.expect);
+    if (replay) {
+      const id = replay.attackRun(a.id);
+      if (id) void follow(id);
+    }
   };
 
   const status = run?.status;
-  const running = status !== undefined && !isTerminal(status);
+  const running = status !== undefined && !isTerminal(status) && busy;
   const duration = useMemo(() => (run ? durationSeconds(run) : null), [run]);
 
   return (
@@ -163,39 +215,53 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
 
       <main>
         <section className="panel editor">
-          <h2>Code</h2>
+          <h2>{replay ? "Recorded code" : "Code"}</h2>
           <div className="controls">
-            <select
-              value={language}
-              onChange={(e) => {
-                const l = e.target.value as Lang;
-                setLanguage(l);
-                setCode(HELLO[l]);
-                setExpect(null);
-              }}
-              aria-label="language"
-            >
-              <option value="python3.12">python 3.12</option>
-              <option value="node20">node 20</option>
-            </select>
-            <label>
-              timeout
-              <input type="number" min={1} max={120} value={timeout}
-                     onChange={(e) => setTimeoutSeconds(Number(e.target.value))} /> s
-            </label>
-            <button className="primary" disabled={!source.canExecute || busy || running}
-                    onClick={() => void submit(language, code, timeout)}>
-              Run
-            </button>
-            <button disabled={!running || !runId} onClick={() => runId && void source.cancel(runId)}>
-              Cancel
-            </button>
-            {!source.canExecute && <span className="muted">replay: this page cannot execute code</span>}
+            {!replay && (
+              <>
+                <select
+                  value={language}
+                  onChange={(e) => {
+                    const l = e.target.value as Language;
+                    setLanguage(l);
+                    setCode(HELLO[l]);
+                    setExpect(null);
+                  }}
+                  aria-label="language"
+                >
+                  <option value="python3.12">python 3.12</option>
+                  <option value="node20">node 20</option>
+                </select>
+                <label>
+                  timeout
+                  <input type="number" min={1} max={120} value={timeout}
+                         onChange={(e) => setTimeoutSeconds(Number(e.target.value))} /> s
+                </label>
+                <button className="primary" disabled={busy || running} onClick={() => void submit()}>Run</button>
+                <button disabled={!running || !runId} onClick={() => runId && void source.cancel(runId)}>Cancel</button>
+              </>
+            )}
+            {replay && (
+              <>
+                <span className="muted">{language === "node20" ? "node 20" : "python 3.12"} · recorded, read-only</span>
+                <label>
+                  speed
+                  <select defaultValue="1" onChange={(e) => replay.setSpeed(Number(e.target.value))} aria-label="speed">
+                    <option value="1">1× (original timing)</option>
+                    <option value="4">4×</option>
+                    <option value="20">20×</option>
+                  </select>
+                </label>
+                <button className="primary" disabled={!runId || busy} onClick={() => runId && void follow(runId)}>
+                  Replay
+                </button>
+              </>
+            )}
           </div>
-          <textarea className="code mono" spellCheck={false} value={code}
+          <textarea className="code mono" spellCheck={false} value={code} readOnly={!!replay}
                     onChange={(e) => setCode(e.target.value)} aria-label="code" />
           <div className="attacks">
-            <span className="muted">Try an attack:</span>
+            <span className="muted">{replay ? "Watch an attack:" : "Try an attack:"}</span>
             {ATTACKS.map((a) => (
               <button key={a.id} className="attack" onClick={() => loadAttack(a)} title={a.expect}>
                 {a.label}
@@ -205,7 +271,7 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
           {expect && <p className="expect"><strong>Healthy outcome:</strong> {expect}</p>}
         </section>
 
-        <ClusterPanel cluster={cluster} />
+        {replay ? <ResultsPanel snap={replay.snapshot} /> : <ClusterPanel cluster={cluster} />}
       </main>
 
       <section className="panel">
@@ -224,7 +290,7 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
         )}
         {error && <p className="error" role="alert">{error}</p>}
         <pre className="log mono" ref={logRef} aria-live="polite">
-          {lines.length === 0 && <span className="muted">no output yet</span>}
+          {lines.length === 0 && <span className="muted">{replay ? "pick a recorded run below, or an attack above" : "no output yet"}</span>}
           {lines.map((l, i) => (
             <span key={i} className={`l-${l.kind}`}>{l.kind === "state" ? l.text + "\n" : l.text}</span>
           ))}
@@ -232,21 +298,24 @@ export default function App({ source, onKeyChange }: { source: DataSource; onKey
       </section>
 
       <section className="panel">
-        <h2>Recent runs</h2>
+        <h2>{replay ? "Recorded runs" : "Recent runs"}</h2>
         <table>
           <thead>
-            <tr><th>id</th><th>lang</th><th>status</th><th>exit</th><th>time</th><th>node</th><th>created</th></tr>
+            <tr>
+              <th>{replay ? "run" : "id"}</th><th>lang</th><th>status</th><th>exit</th><th>time</th><th>node</th>
+              {!replay && <th>created</th>}
+            </tr>
           </thead>
           <tbody>
             {runs.map((r) => (
               <tr key={r.id} className={r.id === runId ? "sel" : ""} onClick={() => void follow(r.id)}>
-                <td className="mono">{r.id.slice(0, 8)}</td>
+                <td className={replay ? "" : "mono"}>{replay ? r.label : r.id.slice(0, 8)}</td>
                 <td>{r.language}</td>
                 <td><StatusBadge status={r.status} /></td>
                 <td>{r.exit_code ?? "–"}</td>
                 <td>{fmt(durationSeconds(r))}</td>
                 <td className="mono">{r.node ?? "–"}</td>
-                <td>{new Date(r.created_at).toLocaleTimeString()}</td>
+                {!replay && <td>{new Date(r.created_at).toLocaleTimeString()}</td>}
               </tr>
             ))}
             {runs.length === 0 && <tr><td colSpan={7} className="muted">no runs yet</td></tr>}

@@ -9,6 +9,7 @@ export const isTerminal = (s: Status) => TERMINAL.includes(s);
 
 export interface RunSummary {
   id: string;
+  label?: string; // replay mode: human name of the recorded run
   language: string;
   status: Status;
   timeout_seconds: number;
@@ -21,6 +22,7 @@ export interface RunSummary {
 }
 
 export interface Run extends RunSummary {
+  code?: string; // replay mode only
   stdout: string;
   stderr: string;
   truncated: boolean;

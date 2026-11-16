@@ -73,3 +73,6 @@ th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--line
 th { color: var(--muted); font-weight: 500; }
 tbody tr { cursor: pointer; } tbody tr:hover, tr.sel { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 a { color: var(--run); }
+.results { overflow-x: auto; }
+.results table { font-size: 12px; }
+.results th, .results td { padding: 3px 6px; }

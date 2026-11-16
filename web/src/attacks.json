@@ -1,0 +1,72 @@
+{
+  "attacks": [
+    {
+      "id": "network",
+      "label": "Reach the network",
+      "language": "python3.12",
+      "timeout": 60,
+      "expect": "Every outbound attempt is closed; loopback (control) is OPEN; the run still succeeds.",
+      "code": "import socket\n\ndef tcp(host, port):\n    s = socket.socket(); s.settimeout(3)\n    try:\n        s.connect((host, port)); return \"OPEN\"\n    except Exception as e:\n        return \"closed:\" + type(e).__name__\n    finally:\n        s.close()\n\nprint(\"public 1.1.1.1:443   \", tcp(\"1.1.1.1\", 443))\nprint(\"k8s api 10.96.0.1:443\", tcp(\"10.96.0.1\", 443))\nprint(\"cloud metadata       \", tcp(\"169.254.169.254\", 80))\ntry:\n    socket.getaddrinfo(\"example.com\", 80); print(\"dns                   OPEN\")\nexcept Exception as e:\n    print(\"dns                   closed:\" + type(e).__name__)\nsrv = socket.socket(); srv.bind((\"127.0.0.1\", 0)); srv.listen(1)\nprint(\"loopback (control)   \", tcp(\"127.0.0.1\", srv.getsockname()[1]))\n"
+    },
+    {
+      "id": "token",
+      "label": "Steal a service-account token",
+      "language": "python3.12",
+      "timeout": 20,
+      "expect": "False False False: there is no token and no secrets directory.",
+      "code": "import os\np = \"/var/run/secrets/kubernetes.io/serviceaccount\"\nprint(os.path.exists(p), os.path.exists(p + \"/token\"), os.path.exists(\"/var/run/secrets\"))\n"
+    },
+    {
+      "id": "write",
+      "label": "Write outside /tmp",
+      "language": "python3.12",
+      "timeout": 20,
+      "expect": "Errno 30 (read-only file system) everywhere except /tmp.",
+      "code": "for path in [\"/etc/pwned\", \"/usr/pwned\", \"/pwned\", \"/code/pwned\"]:\n    try:\n        open(path, \"w\").write(\"x\"); print(path, \"WRITTEN\")\n    except OSError as e:\n        print(path, \"errno\", e.errno, e.strerror)\nopen(\"/tmp/ok\", \"w\").write(\"x\"); print(\"/tmp ok\")\n"
+    },
+    {
+      "id": "memory",
+      "label": "Eat all memory",
+      "language": "python3.12",
+      "timeout": 30,
+      "expect": "oom_killed: the 512Mi limit kills the process; the node is unaffected.",
+      "code": "x = b\"x\" * (2 * 1024 ** 3)\nprint(len(x))\n"
+    },
+    {
+      "id": "fork",
+      "label": "Fork bomb",
+      "language": "python3.12",
+      "timeout": 10,
+      "expect": "Contained by the PID limit; ends at the timeout (or OOM); other runs keep working.",
+      "code": "import os\nwhile True:\n    try:\n        pid = os.fork()\n    except OSError:\n        continue\n    if pid == 0:\n        while True:\n            pass\n"
+    },
+    {
+      "id": "loop",
+      "label": "Infinite loop",
+      "language": "python3.12",
+      "timeout": 5,
+      "expect": "timed_out at about 5 s, killed by the entrypoint wrapper (not the 35 s backstop).",
+      "code": "while True:\n    pass\n"
+    },
+    {
+      "id": "output",
+      "label": "Unbounded output",
+      "language": "python3.12",
+      "timeout": 5,
+      "expect": "Output truncated at 1 MiB per stream with the truncated flag set; the control plane stays flat.",
+      "code": "import sys\nline = \"x\" * 1000 + \"\\n\"\nwhile True:\n    sys.stdout.write(line)\n"
+    },
+    {
+      "id": "caps",
+      "label": "Mount, chroot, raw socket",
+      "language": "python3.12",
+      "timeout": 20,
+      "expect": "uid 10001, no capabilities, every privileged call returns EPERM (1).",
+      "code": "import ctypes, os, socket\nprint(\"uid\", os.getuid())\nst = dict(l.split(\":\\t\", 1) for l in open(\"/proc/self/status\").read().splitlines() if \":\\t\" in l)\nprint(\"CapEff\", st[\"CapEff\"].strip(), \"NoNewPrivs\", st[\"NoNewPrivs\"].strip())\nlibc = ctypes.CDLL(None, use_errno=True)\nprint(\"mount ->\", libc.mount(b\"none\", b\"/tmp\", b\"tmpfs\", 0, None), \"errno\", ctypes.get_errno())\ntry:\n    os.chroot(\"/tmp\"); print(\"chroot OK\")\nexcept OSError as e:\n    print(\"chroot errno\", e.errno)\ntry:\n    socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP); print(\"raw socket OK\")\nexcept OSError as e:\n    print(\"raw socket errno\", e.errno)\n"
+    }
+  ],
+  "hello": {
+    "python3.12": "import sys\nprint(\"hello from\", sys.version.split()[0])\n",
+    "node20": "console.log(\"hello from node\", process.version);\n"
+  }
+}

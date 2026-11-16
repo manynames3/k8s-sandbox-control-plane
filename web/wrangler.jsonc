@@ -1,0 +1,6 @@
+{
+  // Workers static assets: the public replay site is only files, there is no Worker code and no bindings.
+  "name": "ksc-replay",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" }
+}

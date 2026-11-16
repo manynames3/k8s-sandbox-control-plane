@@ -1,0 +1,715 @@
+{
+ "version": 1,
+ "recorded_on": "2026-11-16",
+ "environment": "kind-on-mac",
+ "meta": {
+  "kubernetes_version": "v1.36.4",
+  "container_runtime": "containerd://2.3.4",
+  "worker_nodes": 2,
+  "concurrency_cap": 4,
+  "git_sha": "96b686a"
+ },
+ "links": {
+  "repo": "https://github.com/manynames3/k8s-sandbox-control-plane",
+  "ci": "https://github.com/manynames3/k8s-sandbox-control-plane/actions/workflows/ci.yml",
+  "results": "https://github.com/manynames3/k8s-sandbox-control-plane/blob/main/bench/results/2026-11-16-kind-on-mac.json"
+ },
+ "runs": [
+  {
+   "id": "319428f9",
+   "label": "Hello, Python",
+   "kind": "state",
+   "attack_id": null,
+   "language": "python3.12",
+   "timeout_seconds": 30,
+   "status": "succeeded",
+   "exit_code": 0,
+   "termination_reason": null,
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "hello from 3.12.16\n",
+   "stderr": "",
+   "duration_seconds": 2.737,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.464,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.541,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 1.55,
+     "kind": "stdout",
+     "text": "hello from 3.12.16\n"
+    },
+    {
+     "t": 3.097,
+     "kind": "state",
+     "status": "succeeded"
+    }
+   ]
+  },
+  {
+   "id": "11b99ffb",
+   "label": "Hello, Node",
+   "kind": "state",
+   "attack_id": null,
+   "language": "node20",
+   "timeout_seconds": 30,
+   "status": "succeeded",
+   "exit_code": 0,
+   "termination_reason": null,
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "hello from node v20.20.2\n",
+   "stderr": "",
+   "duration_seconds": 3.021,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.5,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.147,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 1.152,
+     "kind": "stdout",
+     "text": "hello from node v20.20.2\n"
+    },
+    {
+     "t": 3.252,
+     "kind": "state",
+     "status": "succeeded"
+    }
+   ]
+  },
+  {
+   "id": "c1b1d262",
+   "label": "Exit code 3 (failed)",
+   "kind": "state",
+   "attack_id": null,
+   "language": "python3.12",
+   "timeout_seconds": 30,
+   "status": "failed",
+   "exit_code": 3,
+   "termination_reason": "nonzero_exit",
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "about to fail\n",
+   "stderr": "error: bad input\n",
+   "duration_seconds": 1.665,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.359,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 0.908,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 1.437,
+     "kind": "stdout",
+     "text": "about to fail\n"
+    },
+    {
+     "t": 1.437,
+     "kind": "stderr",
+     "text": "error: bad input\n"
+    },
+    {
+     "t": 2.476,
+     "kind": "state",
+     "status": "failed"
+    }
+   ]
+  },
+  {
+   "id": "e276babf",
+   "label": "Reach the network",
+   "kind": "attack",
+   "attack_id": "network",
+   "language": "python3.12",
+   "timeout_seconds": 60,
+   "status": "succeeded",
+   "exit_code": 0,
+   "termination_reason": null,
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "public 1.1.1.1:443    closed:TimeoutError\nk8s api 10.96.0.1:443 closed:TimeoutError\ncloud metadata        closed:TimeoutError\ndns                   closed:gaierror\nloopback (control)    OPEN\n",
+   "stderr": "",
+   "duration_seconds": 31.994,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.508,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.567,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 4.697,
+     "kind": "stdout",
+     "text": "public 1.1.1.1:443    closed:TimeoutError\n"
+    },
+    {
+     "t": 7.296,
+     "kind": "stdout",
+     "text": "k8s api 10.96.0.1:443 closed:TimeoutError\n"
+    },
+    {
+     "t": 10.423,
+     "kind": "stdout",
+     "text": "cloud metadata        closed:TimeoutError\n"
+    },
+    {
+     "t": 30.737,
+     "kind": "stdout",
+     "text": "dns                   closed:gaierror\n"
+    },
+    {
+     "t": 30.737,
+     "kind": "stdout",
+     "text": "loopback (control)    OPEN\n"
+    },
+    {
+     "t": 32.307,
+     "kind": "state",
+     "status": "succeeded"
+    }
+   ]
+  },
+  {
+   "id": "35122c79",
+   "label": "Steal a service-account token",
+   "kind": "attack",
+   "attack_id": "token",
+   "language": "python3.12",
+   "timeout_seconds": 20,
+   "status": "succeeded",
+   "exit_code": 0,
+   "termination_reason": null,
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "False False False\n",
+   "stderr": "",
+   "duration_seconds": 1.643,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.46,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.527,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 1.532,
+     "kind": "stdout",
+     "text": "False False False\n"
+    },
+    {
+     "t": 2.576,
+     "kind": "state",
+     "status": "succeeded"
+    }
+   ]
+  },
+  {
+   "id": "7ac6e1c7",
+   "label": "Write outside /tmp",
+   "kind": "attack",
+   "attack_id": "write",
+   "language": "python3.12",
+   "timeout_seconds": 20,
+   "status": "succeeded",
+   "exit_code": 0,
+   "termination_reason": null,
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "/etc/pwned errno 30 Read-only file system\n/usr/pwned errno 30 Read-only file system\n/pwned errno 30 Read-only file system\n/code/pwned errno 30 Read-only file system\n/tmp ok\n",
+   "stderr": "",
+   "duration_seconds": 2.805,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.297,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.372,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 1.381,
+     "kind": "stdout",
+     "text": "/etc/pwned errno 30 Read-only file system\n"
+    },
+    {
+     "t": 1.381,
+     "kind": "stdout",
+     "text": "/usr/pwned errno 30 Read-only file system\n/pwned errno 30 Read-only file system\n/code/pwned errno 30 Read-only file system\n"
+    },
+    {
+     "t": 1.381,
+     "kind": "stdout",
+     "text": "/tmp ok\n"
+    },
+    {
+     "t": 2.934,
+     "kind": "state",
+     "status": "succeeded"
+    }
+   ]
+  },
+  {
+   "id": "c8c12132",
+   "label": "Eat all memory",
+   "kind": "attack",
+   "attack_id": "memory",
+   "language": "python3.12",
+   "timeout_seconds": 30,
+   "status": "oom_killed",
+   "exit_code": 137,
+   "termination_reason": "OOMKilled",
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "",
+   "stderr": "",
+   "duration_seconds": 3.648,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.378,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.023,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 3.692,
+     "kind": "state",
+     "status": "oom_killed"
+    }
+   ]
+  },
+  {
+   "id": "18c87b2b",
+   "label": "Fork bomb",
+   "kind": "attack",
+   "attack_id": "fork",
+   "language": "python3.12",
+   "timeout_seconds": 10,
+   "status": "timed_out",
+   "exit_code": 124,
+   "termination_reason": "timeout",
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "",
+   "stderr": "",
+   "duration_seconds": 12.726,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.503,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.151,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 13.037,
+     "kind": "state",
+     "status": "timed_out"
+    }
+   ]
+  },
+  {
+   "id": "58aa032f",
+   "label": "Infinite loop",
+   "kind": "attack",
+   "attack_id": "loop",
+   "language": "python3.12",
+   "timeout_seconds": 5,
+   "status": "timed_out",
+   "exit_code": 124,
+   "termination_reason": "timeout",
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "",
+   "stderr": "",
+   "duration_seconds": 8.031,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.271,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.336,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 8.037,
+     "kind": "state",
+     "status": "timed_out"
+    }
+   ]
+  },
+  {
+   "id": "e88b23ed",
+   "label": "Unbounded output",
+   "kind": "attack",
+   "attack_id": "output",
+   "language": "python3.12",
+   "timeout_seconds": 5,
+   "status": "timed_out",
+   "exit_code": 124,
+   "termination_reason": "timeout",
+   "truncated": true,
+   "node": "worker-1",
+   "stdout": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n... [1,040,384 more bytes not shown in this recording]\n",
+   "stderr": "",
+   "duration_seconds": 6.99,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.225,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 0.858,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 0.878,
+     "kind": "stdout",
+     "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+     "t": 0.878,
+     "kind": "stdout",
+     "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+     "t": 7.659,
+     "kind": "state",
+     "status": "timed_out"
+    }
+   ]
+  },
+  {
+   "id": "3f173451",
+   "label": "Mount, chroot, raw socket",
+   "kind": "attack",
+   "attack_id": "caps",
+   "language": "python3.12",
+   "timeout_seconds": 20,
+   "status": "succeeded",
+   "exit_code": 0,
+   "termination_reason": null,
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "uid 10001\nCapEff 0000000000000000 NoNewPrivs 1\nmount -> -1 errno 1\nchroot errno 1\nraw socket errno 1\n",
+   "stderr": "",
+   "duration_seconds": 1.764,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.47,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.126,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 1.645,
+     "kind": "stdout",
+     "text": "uid 10001\n"
+    },
+    {
+     "t": 1.645,
+     "kind": "stdout",
+     "text": "CapEff 0000000000000000 NoNewPrivs 1\n"
+    },
+    {
+     "t": 1.645,
+     "kind": "stdout",
+     "text": "mount -> -1 errno 1\n"
+    },
+    {
+     "t": 1.645,
+     "kind": "stdout",
+     "text": "chroot errno 1\n"
+    },
+    {
+     "t": 1.645,
+     "kind": "stdout",
+     "text": "raw socket errno 1\n"
+    },
+    {
+     "t": 2.69,
+     "kind": "state",
+     "status": "succeeded"
+    }
+   ]
+  },
+  {
+   "id": "b26ad0f6",
+   "label": "Cancelled while running",
+   "kind": "state",
+   "attack_id": null,
+   "language": "python3.12",
+   "timeout_seconds": 120,
+   "status": "cancelled",
+   "exit_code": null,
+   "termination_reason": "cancelled",
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "",
+   "stderr": "",
+   "duration_seconds": 3.441,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.423,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.496,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 3.573,
+     "kind": "state",
+     "status": "cancelled"
+    }
+   ]
+  },
+  {
+   "id": "4086b20e",
+   "label": "Platform fault (infra_error)",
+   "kind": "state",
+   "attack_id": null,
+   "language": "python3.12",
+   "timeout_seconds": 120,
+   "status": "infra_error",
+   "exit_code": 137,
+   "termination_reason": "pod_deleted",
+   "truncated": false,
+   "node": "worker-1",
+   "stdout": "",
+   "stderr": "",
+   "duration_seconds": 8.85,
+   "created_at_offset": 0.0,
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "state",
+     "status": "queued"
+    },
+    {
+     "t": 0.544,
+     "kind": "state",
+     "status": "dispatching"
+    },
+    {
+     "t": 1.616,
+     "kind": "state",
+     "status": "running"
+    },
+    {
+     "t": 9.39,
+     "kind": "state",
+     "status": "infra_error"
+    }
+   ]
+  }
+ ],
+ "benchmark": {
+  "date": "2026-11-16",
+  "environment": "kind-on-mac",
+  "git_sha": "96b686a",
+  "kubernetes_version": "v1.36.4",
+  "container_runtime": "containerd://2.3.4",
+  "worker_nodes": 2,
+  "concurrency_cap": 4,
+  "workload": "python3.12: sum of squares over 1.5M integers (~0.2 s CPU), 500m CPU / 512Mi limits",
+  "levels": [
+   {
+    "concurrency": 5,
+    "sample_size": 200,
+    "statuses": {
+     "succeeded": 200
+    },
+    "infra_error_ratio": 0.0,
+    "wall_seconds": 181.0,
+    "throughput_runs_per_second": 1.105,
+    "queue_wait_seconds": {
+     "p50": 1.197,
+     "p95": 2.296,
+     "p99": 2.762,
+     "max": 4.121
+    },
+    "schedule_seconds": {
+     "p50": 0.09,
+     "p95": 0.62,
+     "p99": 0.781,
+     "max": 0.799
+    },
+    "exec_seconds": {
+     "p50": 2.868,
+     "p95": 3.598,
+     "p99": 3.939,
+     "max": 4.047
+    },
+    "e2e_seconds": {
+     "p50": 4.282,
+     "p95": 5.462,
+     "p99": 5.852,
+     "max": 7.657
+    }
+   },
+   {
+    "concurrency": 20,
+    "sample_size": 200,
+    "statuses": {
+     "succeeded": 200
+    },
+    "infra_error_ratio": 0.0,
+    "wall_seconds": 168.4,
+    "throughput_runs_per_second": 1.187,
+    "queue_wait_seconds": {
+     "p50": 13.03,
+     "p95": 15.026,
+     "p99": 15.562,
+     "max": 15.707
+    },
+    "schedule_seconds": {
+     "p50": 0.285,
+     "p95": 0.786,
+     "p99": 0.887,
+     "max": 1.37
+    },
+    "exec_seconds": {
+     "p50": 2.852,
+     "p95": 3.52,
+     "p99": 3.901,
+     "max": 4.49
+    },
+    "e2e_seconds": {
+     "p50": 16.001,
+     "p95": 18.341,
+     "p99": 18.809,
+     "max": 19.176
+    }
+   }
+  ],
+  "cold_start": {
+   "measured": false,
+   "reason": "kind loads images into nodes; pulled-versus-pre-pulled needs a registry (EKS session)"
+  },
+  "vm": {
+   "cpus": 4,
+   "memory_bytes": 8589934592
+  },
+  "results_file": "bench/results/2026-11-16-kind-on-mac.json"
+ }
+}
