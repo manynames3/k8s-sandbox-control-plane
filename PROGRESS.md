@@ -30,3 +30,21 @@
 **Deferred:** ValidatingAdmissionPolicy (phase 4); dispatcher and runner (phase 2). Not yet verified: images are arm64 only.
 
 **Next:** phase 2, one Python run end to end.
+
+## Phase 2 — One Python run end to end (2026-11-16, ~1.5 h)
+
+**Done:**
+- Runner: `runner/Dockerfile.python` (python:3.12-slim pinned by digest, UID 10001) and `runner/ksc_run.py` wrapper: hard timeout (exit 124), JSON-lines framing so stdout/stderr are separable from the K8s log API, 1 MiB cap per stream (excess drained, `truncated` flagged).
+- `dispatcher/podspec.py`: single fixed Job template (every hardening field asserted in `tests/unit/test_podspec.py`); user code only enters as an immutable ConfigMap owned by the Job.
+- API: `POST /v1/runs` (202, `Idempotency-Key`, 409 on mismatched reuse, 422 validation), `GET /v1/runs/{id}` (private per key), hashed API keys, `python -m api.keys create`.
+- Dispatcher (`dispatcher/core.py`): claim under a transaction-level advisory lock + `SKIP LOCKED` (never exceeds cap, tested with 8 threads), create Job+ConfigMap idempotently, observe pods, classify result (succeeded/failed/timed_out/oom_killed/infra_error), persist, then delete Job/ConfigMap. Terminal states are never overwritten. Chart deploys it.
+- `make test` now starts a throwaway Postgres; `make e2e`.
+
+**Verified how:** `make test` 40 passed; ruff + mypy clean; `make up` from the running cluster; `make e2e` 1 passed (`print('hello')` -> `succeeded`, stdout `hello\n`, node recorded) and the cleanup proof (Job, Pod, ConfigMap for the run gone within a bounded wait) passed; `make verify-cluster` still PASS; `sandboxes` namespace empty afterwards.
+
+**Deviation from the handoff:** the "watch loop" is a 1 s poll of the pod list, not a Kubernetes watch stream. Simpler and robust for the chaos tests; revisit if latency matters.
+
+**Deferred to phase 3:** cancel, reconcile (runs with no Job), sweeper, layer-2 timeout handling, per-key rate limit and concurrency cap (columns exist, not enforced), log streaming events, infra_error paths beyond pod-level.
+**Not verified:** timeout, OOM and non-zero exit paths on the real cluster (unit-tested via fake only).
+
+**Disk:** internal free 10 GB at end. The 15->9 GB drop was the Claude desktop app's own VM bundle (~9 GB) and a 596 MB `~/.remodex` log, not this project; project footprint on internal disk is ~350 MB of Homebrew CLIs.

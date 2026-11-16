@@ -6,7 +6,11 @@ concurrencyCap: 4
 
 image:
   api: ksc/api:dev
+  runnerPython: ksc/runner-python:dev
   pullPolicy: IfNotPresent
+
+dispatcher:
+  replicas: 1
 
 postgres:
   enabled: true            # in-cluster Postgres (local/CI). Off on EKS (Neon).
