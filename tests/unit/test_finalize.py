@@ -97,3 +97,19 @@ def test_pod_that_finished_cleanly_is_not_misclassified_by_deletion(db):
     p.deleting = True
     core.finalize(db, FakeKube(""), rid, p)
     assert get(db, rid).status == "succeeded"
+
+
+@pytest.mark.parametrize("message,expected,reason", [
+    ("Pod ephemeral local storage usage exceeds the total limit of containers 128Mi.",
+     "failed", "ephemeral_storage_exceeded"),
+    ('Usage of EmptyDir volume "tmp" exceeds the limit "64Mi". ',  # real kubelet message, kind v1.36
+     "failed", "ephemeral_storage_exceeded"),
+    ("The node was low on resource: memory.", "infra_error", "evicted"),
+])
+def test_eviction_is_user_fault_only_for_storage(db, message, expected, reason):
+    rid = make_run(db)
+    p = pod(rid, 137, "Error", "Failed")
+    p.pod_reason, p.message = "Evicted", message
+    core.finalize(db, FakeKube(""), rid, p)
+    run = get(db, rid)
+    assert (run.status, run.termination_reason) == (expected, reason)

@@ -47,7 +47,7 @@
 **Deferred to phase 3:** cancel, reconcile (runs with no Job), sweeper, layer-2 timeout handling, per-key rate limit and concurrency cap (columns exist, not enforced), log streaming events, infra_error paths beyond pod-level.
 **Not verified:** timeout, OOM and non-zero exit paths on the real cluster (unit-tested via fake only).
 
-**Disk:** internal free 10 GB at end. The 15->9 GB drop was the Claude desktop app's own VM bundle (~9 GB) and a 596 MB `~/.remodex` log, not this project; project footprint on internal disk is ~350 MB of Homebrew CLIs.
+**Disk:** internal free 10 GB at end. The 15->9 GB drop was the Claude desktop app's own VM bundle (~9 GB) and a large log from an unrelated tool, not this project; project footprint on internal disk is ~350 MB of Homebrew CLIs.
 
 ## Phase 3 — Timeouts, OOM, exit codes, cancel, infra errors, sweeper, reconcile, idempotency (2026-11-16, ~1 h)
 

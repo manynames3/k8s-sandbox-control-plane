@@ -22,6 +22,8 @@ class PodInfo:
     waiting_reason: str | None = None  # e.g. ErrImagePull while Pending
     created: datetime | None = None
     deleting: bool = False  # deletionTimestamp set: something outside the run removed the pod
+    pod_reason: str | None = None  # pod-level reason, e.g. Evicted
+    message: str | None = None
 
 
 @dataclass
@@ -97,7 +99,8 @@ class RealKube:
             out[run_id] = PodInfo(p.metadata.name, run_id, p.status.phase, p.spec.node_name,
                                   started, exit_code, reason or p.status.reason, waiting,
                                   p.metadata.creation_timestamp,
-                                  p.metadata.deletion_timestamp is not None)
+                                  p.metadata.deletion_timestamp is not None,
+                                  p.status.reason, p.status.message)
         return out
 
     def list_objects(self) -> list[Obj]:

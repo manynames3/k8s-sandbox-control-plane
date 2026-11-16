@@ -1,11 +1,11 @@
-.PHONY: doctor disk clean nuke up down test e2e lint verify-cluster
+.PHONY: doctor disk clean nuke up down test e2e attack chaos lint verify-cluster
 WORKERS ?= 2
 CLUSTER ?= ksc
 IMAGE_API ?= ksc/api:dev
 IMAGE_RUNNER_PY ?= ksc/runner-python:dev
 
 up:
-	@bash scripts/doctor.sh >/dev/null || { echo "make doctor failed"; exit 1; }
+	@[ -n "$$CI" ] || bash scripts/doctor.sh >/dev/null || { echo "make doctor failed"; exit 1; }
 	WORKERS=$(WORKERS) CLUSTER_NAME=$(CLUSTER) deploy/kind/up.sh
 	docker build -q -f Dockerfile.api -t $(IMAGE_API) .
 	docker build -q -f runner/Dockerfile.python -t $(IMAGE_RUNNER_PY) .
@@ -28,6 +28,12 @@ test:
 
 e2e:
 	uv run pytest -q -m e2e tests/e2e
+
+attack:
+	uv run pytest -v -m attack tests/attack
+
+chaos:
+	uv run pytest -v -m chaos tests/chaos
 
 lint:
 	uv run ruff check . && uv run mypy api dispatcher

@@ -1,0 +1,48 @@
+# Defence in depth: even if the dispatcher has a bug (or someone applies a pod by hand), the
+# cluster refuses pods in the sandbox namespace that break the guarantees. Pod Security Admission
+# (restricted) covers privilege, host access and capabilities; this policy adds what PSA does not.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: ksc-sandbox-pod-guardrails
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: >-
+        object.spec.containers.all(c, has(c.securityContext) &&
+        has(c.securityContext.readOnlyRootFilesystem) && c.securityContext.readOnlyRootFilesystem == true) &&
+        (!has(object.spec.initContainers) || object.spec.initContainers.all(c, has(c.securityContext) &&
+        has(c.securityContext.readOnlyRootFilesystem) && c.securityContext.readOnlyRootFilesystem == true))
+      message: "every container must set securityContext.readOnlyRootFilesystem: true"
+      reason: Forbidden
+    - expression: >-
+        has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false
+      message: "pods must set automountServiceAccountToken: false"
+      reason: Forbidden
+    - expression: >-
+        object.spec.containers.all(c, has(c.resources) && has(c.resources.limits) &&
+        'cpu' in c.resources.limits && 'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits)
+      message: "every container must set cpu, memory and ephemeral-storage limits"
+      reason: Forbidden
+    - expression: >-
+        !has(object.spec.volumes) || object.spec.volumes.all(v, has(v.configMap) || has(v.emptyDir))
+      message: "only configMap and emptyDir volumes are allowed"
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: ksc-sandbox-pod-guardrails
+spec:
+  policyName: ksc-sandbox-pod-guardrails
+  validationActions: [Deny]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Values.sandboxNamespace }}

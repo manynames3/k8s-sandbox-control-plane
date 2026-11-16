@@ -100,6 +100,13 @@ def dispatch(engine: Engine, kube: Kube, c: Claimed, sandbox: podspec.SandboxSet
 def classify(pod: PodInfo, parsed: logparse.ParsedLogs) -> tuple[str, str | None]:
     if pod.reason == "OOMKilled":
         return "oom_killed", "OOMKilled"
+    if pod.pod_reason == "Evicted":
+        # The kubelet evicts a pod that exceeds its ephemeral-storage limit: that is the user's
+        # code, not a platform fault. Any other eviction (node pressure) is ours.
+        msg = (pod.message or "").lower()
+        if "ephemeral" in msg or "emptydir volume" in msg:
+            return "failed", "ephemeral_storage_exceeded"
+        return "infra_error", "evicted"
     if pod.deleting and pod.exit_code != 0:
         return "infra_error", "pod_deleted"  # killed from outside; not the user's code failing
     if pod.reason == "DeadlineExceeded" and pod.exit_code is None:

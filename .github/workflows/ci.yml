@@ -1,0 +1,103 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+
+env:
+  KIND_VERSION: v0.33.0
+  TRIVY_VERSION: v0.76.2
+  KUBECONFORM_VERSION: v0.8.0
+
+jobs:
+  lint-and-unit:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: {POSTGRES_PASSWORD: x}
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run mypy api dispatcher
+      - name: Unit tests
+        env:
+          TEST_DATABASE_URL: postgresql+psycopg://postgres:x@localhost:55432/postgres
+        run: uv run pytest -q
+
+  static-checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env: {GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+      - name: Install trivy and kubeconform
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin "$TRIVY_VERSION"
+          curl -sfL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | sudo tar xz -C /usr/local/bin kubeconform
+      - name: Chart is valid Kubernetes
+        run: |
+          helm lint charts/ksc -f charts/ksc/values-kind.yaml
+          helm template ksc charts/ksc -n ksc-system -f charts/ksc/values-kind.yaml | kubeconform -strict -ignore-missing-schemas -summary
+      - name: Cost traps (no load balancer, ingress, NAT, RDS)
+        run: scripts/check-cost-traps.sh
+      - name: No files over 5 MB
+        run: scripts/check-file-sizes.sh
+      - name: trivy misconfiguration scan (chart, Dockerfiles)
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL --skip-files deploy/kind/calico-v3.33.1.yaml .
+      - name: tflint / checkov (only once infra/ exists, phase 8)
+        run: |
+          if [ -d infra ]; then echo "infra present: wire tflint and checkov here"; exit 1; fi
+          echo "no terraform yet"
+
+  cluster-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - name: Install kind
+        run: |
+          curl -sfLo kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          sudo install kind /usr/local/bin/kind
+      - name: Cluster up (kind + Calico, chart, images)
+        run: make up WORKERS=2
+      - name: trivy image scan
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sudo sh -s -- -b /usr/local/bin "$TRIVY_VERSION"
+          for img in ksc/api:dev ksc/runner-python:dev; do
+            trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed "$img"
+          done
+      - name: Cluster guarantees
+        run: make verify-cluster
+      - name: e2e
+        run: set -o pipefail; make e2e 2>&1 | tee e2e.log
+      - name: Attack suite
+        run: set -o pipefail; make attack 2>&1 | tee attack.log
+      - name: Chaos tests
+        run: set -o pipefail; make chaos 2>&1 | tee chaos.log
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get nodes,pods -A -o wide || true
+          kubectl -n ksc-system logs deploy/ksc-dispatcher --tail=300 || true
+          kubectl -n sandboxes get all,events || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs
+          path: "*.log"
+          if-no-files-found: ignore

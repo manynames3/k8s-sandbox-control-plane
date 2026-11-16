@@ -20,6 +20,6 @@ def get_engine() -> Engine:
     if _engine is None:
         # prepare_threshold=None: no server-side prepared statements (PgBouncer transaction mode).
         _engine = create_engine(
-            database_url(), pool_pre_ping=True, connect_args={"prepare_threshold": None}
+            database_url(), pool_pre_ping=True, connect_args={"prepare_threshold": None, "connect_timeout": 3}
         )
     return _engine

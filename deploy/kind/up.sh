@@ -5,8 +5,10 @@ cd "$(dirname "$0")/../.."
 WORKERS="${WORKERS:-2}"
 NAME="${CLUSTER_NAME:-ksc}"
 IMAGE="kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
-[ -n "${CX:-}" ] || { echo "CX unset: source \$CX/env.sh" >&2; exit 1; }
-[ "$(docker context show)" = colima ] || { echo "docker context is not colima" >&2; exit 1; }
+if [ -z "${CI:-}" ]; then  # local only: the drive/Colima setup (CI runners have neither)
+  [ -n "${CX:-}" ] || { echo "CX unset: source \$CX/env.sh" >&2; exit 1; }
+  [ "$(docker context show)" = colima ] || { echo "docker context is not colima" >&2; exit 1; }
+fi
 if kind get clusters 2>/dev/null | grep -qx "$NAME"; then
   echo "cluster $NAME exists; reusing"
 else

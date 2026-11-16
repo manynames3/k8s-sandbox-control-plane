@@ -15,6 +15,7 @@ check "dispatcher cannot read secrets" '[ "$(kubectl auth can-i get secrets -n s
 check "dispatcher has nothing cluster-wide" '[ "$(kubectl auth can-i list pods -A --as=system:serviceaccount:ksc-system:ksc-dispatcher)" = no ]'
 check "sandbox SA has no rbac" '[ "$(kubectl auth can-i list pods -n sandboxes --as=system:serviceaccount:sandboxes:sandbox)" = no ]'
 check "PSA rejects privileged pod" '! kubectl -n sandboxes run priv --image=busybox --privileged --restart=Never --dry-run=server'
+check "admission policy bound to sandboxes" 'kubectl get validatingadmissionpolicybinding ksc-sandbox-pod-guardrails'
 check "api deployment available" 'kubectl -n ksc-system rollout status deploy/ksc-api --timeout=60s'
 
 # NetworkPolicy is really enforced: a compliant pod in sandboxes must not reach DNS or the API server.
@@ -32,7 +33,8 @@ spec:
     - name: t
       image: busybox:1.36
       command: ["sh", "-c", "sleep 3600"]
-      securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+      securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}, readOnlyRootFilesystem: true}
+      resources: {limits: {cpu: 100m, memory: 64Mi, ephemeral-storage: 16Mi}}
 YAML
 kubectl -n sandboxes wait --for=condition=Ready pod/nettest --timeout=120s >/dev/null 2>&1
 check "sandbox test pod is Running (otherwise the denials below prove nothing)" '[ "$(kubectl -n sandboxes get pod nettest -o jsonpath={.status.phase})" = Running ] && kubectl -n sandboxes exec nettest -- true'

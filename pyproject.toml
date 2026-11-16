@@ -25,7 +25,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
 pythonpath = ["."]
-markers = ["e2e: needs the kind cluster (make up)"]
+markers = ["e2e: needs the kind cluster (make up)", "attack: hostile-code suite, needs the kind cluster", "chaos: kills components, needs the kind cluster"]
 
 # The kubernetes client ships loose types (everything Optional); this one thin wrapper is the only user.
 [[tool.mypy.overrides]]
