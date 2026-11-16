@@ -36,7 +36,8 @@ jobs:
   session:
     runs-on: ubuntu-24.04
     environment: eks-session   # requires the owner's approval
-    timeout-minutes: 300
+    # Steps below have their own timeouts (about 4.3 hours in total at most); this leaves an hour for the teardown.
+    timeout-minutes: 330
     steps:
       - name: Validate the request
         run: |
@@ -110,6 +111,7 @@ jobs:
           echo "runner_cidr=$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]')/32" >> "$GITHUB_OUTPUT"
 
       - name: Terraform apply (creates the cluster)
+        timeout-minutes: 40
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           terraform apply -input=false -auto-approve \
@@ -117,6 +119,7 @@ jobs:
             -var="runner_cidr=${{ steps.params.outputs.runner_cidr }}"
 
       - name: Connect, install KEDA, create the Neon secret, install the chart
+        timeout-minutes: 30
         env:
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_DATABASE_URL_DIRECT: ${{ secrets.NEON_DATABASE_URL_DIRECT }}
@@ -142,25 +145,31 @@ jobs:
 
       # The first test. If NetworkPolicy is not enforced on this cluster, nothing else is meaningful.
       - name: NetworkPolicy is enforced on this cluster (stops the session if not)
+        timeout-minutes: 15
         env: {KSC_ENV: eks, WORKERS: "2"}
         run: make verify-cluster
 
       - name: e2e
+        timeout-minutes: 30
         env: {KSC_ENV: eks}
         run: set -o pipefail; make e2e 2>&1 | tee e2e.log
       - name: Attack suite (includes the EKS-only instance-metadata test)
+        timeout-minutes: 30
         env: {KSC_ENV: eks}
         run: set -o pipefail; make attack 2>&1 | tee attack.log
       - name: Chaos tests
+        timeout-minutes: 30
         env: {KSC_ENV: eks}
         run: set -o pipefail; make chaos 2>&1 | tee chaos.log
       - name: Benchmark
+        timeout-minutes: 60
         env: {BENCH_ENV: eks-t3-medium}
         run: set -o pipefail; uv run python bench/bench.py --runs 200 --concurrency 5 20 2>&1 | tee bench.log
 
       - name: gVisor (optional, best effort; the outcome is recorded either way)
         if: inputs.try_gvisor
         continue-on-error: true
+        timeout-minutes: 30
         env: {KSC_ENV: eks}
         run: |
           set -o pipefail
@@ -195,26 +204,50 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          role-duration-seconds: 3600
+          role-duration-seconds: 7200
 
       - name: Terraform destroy
+        id: destroy
         if: always() && steps.init.outcome == 'success' && steps.aws2.outcome == 'success'
+        timeout-minutes: 45
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           for attempt in 1 2 3; do
-            terraform destroy -input=false -auto-approve \
+            # A killed apply can leave the state lock behind. Nothing else may legitimately hold it (the concurrency
+            # group runs one session at a time), so the last attempt ignores the lock.
+            lock="-lock-timeout=5m"; [ "$attempt" = 3 ] && lock="-lock=false"
+            terraform destroy -input=false -auto-approve $lock \
               -var="expires_at=${{ steps.params.outputs.expires_at }}" \
               -var="runner_cidr=${{ steps.params.outputs.runner_cidr }}" && exit 0
             echo "destroy attempt $attempt failed; retrying in 60 s"; sleep 60
           done
           exit 1
 
+      # Terraform could not finish (lost or locked state, an unknown dependency, a failed init): delete directly by
+      # tag, then let Terraform reconcile the state and remove what it manages (IAM roles).
+      - name: Fallback - delete directly, then destroy again
+        id: fallback
+        if: always() && steps.aws2.outcome == 'success' && steps.destroy.outcome != 'success'
+        timeout-minutes: 45
+        run: |
+          bash scripts/aws_force_cleanup.sh --yes || echo "direct cleanup reported failures"
+          if [ -d "$TERRAFORM_DIR/.terraform" ]; then
+            cd "$TERRAFORM_DIR"
+            terraform destroy -input=false -auto-approve -lock=false \
+              -var="expires_at=${{ steps.params.outputs.expires_at }}" \
+              -var="runner_cidr=${{ steps.params.outputs.runner_cidr }}"
+          fi
+
       - name: Verify that nothing tagged project=ksc remains
         id: orphans
         if: always() && steps.aws2.outcome == 'success'
         run: |
-          sleep 30   # tag index lag
-          bash scripts/aws_orphans.sh list | tee orphans.txt
+          # Two independent checks: the tag index (lags, misses some types) and direct service queries (no lag, no tags).
+          set +e
+          sleep 30
+          bash scripts/aws_orphans.sh list 2>&1 | tee orphans.txt;  r1=${PIPESTATUS[0]}
+          bash scripts/aws_orphans.sh deep 2>&1 | tee -a orphans.txt; r2=${PIPESTATUS[0]}
+          exit $(( r1 > r2 ? r1 : r2 ))
 
       - name: Open an issue if anything was left behind
         if: always() && steps.orphans.outcome == 'failure'

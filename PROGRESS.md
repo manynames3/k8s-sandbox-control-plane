@@ -142,3 +142,9 @@ each finding against the code before acting. Details of what was fixed and what 
 - **Docs that overclaimed, corrected:** per-key limits, "exactly once", expiry enforcement, the admission policy's coverage, IAM scope.
   (`docs/HANDOFF.md` is the owner's file and was not edited; its API header and "Neon only" egress statement differ from the code.)
 - Regression tests: `tests/unit/test_review_fixes.py` (14 tests) plus two attack-suite tests.
+
+## Teardown hardening (2026-11-16)
+Requested before the first AWS session. Added `aws_orphans.sh deep` (direct queries, no tags), treat a missing `expires-at` as expired,
+`aws_force_cleanup.sh` (dry run by default, tag-scoped direct deletion), lock handling and fallback in `eks-session.yml`, hourly
+reaper with the same fallback, timeouts on every long step. `tests/unit/test_teardown.py` (13 tests, stub `aws`). Unit suite: 127 passed.
+Still unrun against AWS; the first session is the real test. Known gaps listed in docs/AWS.md.

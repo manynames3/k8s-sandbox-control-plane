@@ -20,7 +20,7 @@ cannot show:
    pre-pulled cold start can be measured).
 5. Optional, best effort: gVisor under the sandbox node group (`deploy/eks/gvisor.sh`, **never run**). If it fails the
    workflow records where and the rest of the session is unaffected.
-6. `terraform destroy` in an `if: always()` step, then proof that nothing tagged `project=ksc` remains.
+6. `terraform destroy` in an `if: always()` step, then proof that nothing remains (see "How teardown is made solid").
 
 ## One-time setup (owner checklist)
 
@@ -50,6 +50,28 @@ cannot show:
 8. **Start a session:** Actions > eks-session > Run workflow, choose the lifetime, type `CREATE EKS SESSION`, approve the
    deployment. Expect about $0.25 per hour.
 9. **Afterwards:** read the real cost from Cost Explorer and record it in `docs/COST.md`.
+
+## How teardown is made solid
+
+Layers, in order. All are written and unit-tested against a stub `aws` (`tests/unit/test_teardown.py`); **none has run against AWS**.
+
+1. **Terraform destroy**, always, with fresh credentials, three attempts, a 5-minute lock wait and on the last attempt `-lock=false`
+   (a killed apply can leave the state lock behind; the concurrency group means nothing else legitimately holds it).
+2. **Direct deletion** (`scripts/aws_force_cleanup.sh --yes`) if Terraform could not finish: EKS node groups and cluster, instances,
+   Elastic IPs, VPC networking and launch templates, only what is tagged `project=ksc` (a dry run without `--yes`). Then Terraform
+   runs again to remove the IAM roles and reconcile the state.
+3. **Two independent checks** after the destroy: the tag index (lags, misses some resource types) and direct service queries
+   (`aws_orphans.sh deep`: clusters, instances, VPCs, network interfaces, volumes, addresses, NAT gateways, security groups, launch
+   templates, the three IAM roles). Any hit fails the run and opens an issue.
+4. **The reaper**, every hour, never concurrent with a session: destroys if anything is past its `expires-at`, has **no** `expires-at`,
+   or shows up in the direct check, with the same direct-deletion fallback.
+5. **Bounded steps**: every long step has a timeout and the job allows an hour after the last one, so a hang cannot starve the teardown.
+6. **Budget alerts** ($5, $15, $25) notify you if everything above fails. If GitHub pauses scheduled workflows (60 days without
+   activity), only this layer remains.
+
+Known gaps: the direct deletion is the least-tested code here (the stub proves order and scoping, not that AWS accepts each call);
+a failure inside AWS itself is out of reach; resources created outside Terraform without the `project=ksc` tag are invisible to every
+layer except the three IAM role names and the cluster-name checks.
 
 ## What each IAM permission is for
 

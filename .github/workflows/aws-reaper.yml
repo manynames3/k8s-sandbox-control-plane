@@ -1,11 +1,11 @@
 name: aws-reaper
-# Independent backstop for the session workflow. A few times a day: if anything tagged project=ksc is past its
-# expires-at, destroy the stack and open an issue. NOTE: GitHub pauses scheduled workflows in repositories that
+# Independent backstop for the session workflow. Every hour: if anything tagged project=ksc is past its
+# expires-at (or has no expires-at at all), or direct service queries find session resources, destroy the stack and open an issue. NOTE: GitHub pauses scheduled workflows in repositories that
 # have been inactive for 60 days, so this is not the last line of defence: the AWS Budgets alerts ($5, $15, $25)
 # created by infra/bootstrap are. Read docs/AWS.md.
 on:
   schedule:
-    - cron: "17 1,7,13,19 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
 permissions:
   id-token: write
@@ -45,11 +45,14 @@ jobs:
         if: steps.configured.outputs.yes == 'true'
         run: |
           set +e
-          bash scripts/aws_orphans.sh expired | tee expired.txt
-          rc=${PIPESTATUS[0]}
-          # 1 = found (reap); 2 = the check itself failed: fail the run but never destroy on an error
-          [ "$rc" = 1 ] && echo "found=true" >> "$GITHUB_OUTPUT"
-          exit $(( rc == 1 ? 0 : rc ))
+          # Tag-based (expired or no deadline) and direct (no tags needed). Direct queries cannot tell an expired
+          # session from a live one, but the concurrency group guarantees no session is running while this job runs.
+          bash scripts/aws_orphans.sh expired 2>&1 | tee expired.txt;  r1=${PIPESTATUS[0]}
+          bash scripts/aws_orphans.sh deep 2>&1 | tee -a expired.txt;  r2=${PIPESTATUS[0]}
+          # 1 = found (reap); 2 = a check itself failed: fail the run but destroy only if the other check found something
+          if [ "$r1" = 1 ] || [ "$r2" = 1 ]; then echo "found=true" >> "$GITHUB_OUTPUT"; fi
+          if [ "$r1" = 2 ] || [ "$r2" = 2 ]; then exit 2; fi
+          exit 0
 
       - name: Destroy the stack
         id: destroy
@@ -61,12 +64,29 @@ jobs:
             -backend-config="key=eks/terraform.tfstate" \
             -backend-config="region=${AWS_REGION}" \
             -backend-config="use_lockfile=true"
-          terraform destroy -input=false -auto-approve -var="expires_at=reaped"
+          terraform destroy -input=false -auto-approve -lock-timeout=5m -var="expires_at=reaped" -var="runner_cidr=127.0.0.1/32"
+
+      - name: Fallback - delete directly, then destroy again
+        id: fallback
+        if: always() && steps.expired.outputs.found == 'true' && steps.destroy.outcome != 'success'
+        run: |
+          bash scripts/aws_force_cleanup.sh --yes || echo "direct cleanup reported failures"
+          cd infra/eks
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=eks/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
+          terraform destroy -input=false -auto-approve -lock=false -var="expires_at=reaped" -var="runner_cidr=127.0.0.1/32"
 
       - name: Anything still left after the destroy?
         id: after
         if: steps.expired.outputs.found == 'true'
-        run: sleep 30; bash scripts/aws_orphans.sh list | tee after.txt
+        run: |
+          set +e; sleep 30
+          bash scripts/aws_orphans.sh list 2>&1 | tee after.txt;  r1=${PIPESTATUS[0]}
+          bash scripts/aws_orphans.sh deep 2>&1 | tee -a after.txt; r2=${PIPESTATUS[0]}
+          exit $(( r1 > r2 ? r1 : r2 ))
 
       - name: Open an issue
         if: steps.expired.outputs.found == 'true'
