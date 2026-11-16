@@ -8,13 +8,15 @@ mode="${1:-list}"
 region="${AWS_REGION:-us-east-1}"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
+# Exit codes: 0 nothing found, 1 resources found, 2 the check itself failed (never mistaken for "found").
 all="$(aws resourcegroupstaggingapi get-resources --region "$region" \
   --tag-filters Key=project,Values=ksc \
-  --query 'ResourceTagMappingList[].{arn:ResourceARN,expires:Tags[?Key==`expires-at`]|[0].Value}' --output json)"
+  --query 'ResourceTagMappingList[].{arn:ResourceARN,expires:Tags[?Key==`expires-at`]|[0].Value}' --output json)" \
+  || { echo "the AWS query failed" >&2; exit 2; }
 
 case "$mode" in
   list)    found="$all" ;;
-  expired) found="$(jq --arg now "$now" '[.[] | select(.expires != null and .expires < $now)]' <<<"$all")" ;;
+  expired) found="$(jq --arg now "$now" '[.[] | select(.expires != null and .expires < $now)]' <<<"$all")" || exit 2 ;;
   *) echo "usage: $0 list|expired" >&2; exit 2 ;;
 esac
 

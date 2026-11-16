@@ -21,6 +21,7 @@ keda:
   enabled: true
 
 sandbox:
+  allowedImagePrefixes: ["ghcr.io/manynames3/", "busybox:1.36"]   # busybox: the test probes
   nodeSelector:
     ksc.dev/pool: sandbox
   tolerations:

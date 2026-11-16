@@ -27,8 +27,8 @@ class ApiKey(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100))
     key_hash: Mapped[str] = mapped_column(String(64), unique=True)  # sha256 hex; keys never stored
-    rate_limit_per_min: Mapped[int] = mapped_column(Integer, default=60)
-    concurrency_cap: Mapped[int] = mapped_column(Integer, default=4)
+    rate_limit_per_min: Mapped[int] = mapped_column(Integer, default=600)
+    concurrency_cap: Mapped[int] = mapped_column(Integer, default=200)  # max queued + active runs per key
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -52,6 +52,8 @@ class Run(Base):
     node: Mapped[str | None] = mapped_column(String(253), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # set once the Job exists: a missing Job after this is an infra_error, never a re-run
+    job_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     __table_args__ = (

@@ -128,3 +128,17 @@
 **Verified how:** `terraform fmt -check` and `validate` on both stacks; tflint (aws ruleset 0.40.0) clean; Checkov 58 passed / 0 failed with 7 skips, each justified inline; trivy misconfig clean with 5 accepted findings recorded in `.trivyignore.yaml`; actionlint clean on all five workflows; cost-trap guards (`check-cost-traps.sh`, `check-eks-version.py`) pass and are tested to FAIL on a deliberately broken copy; chart renders and kubeconform-validates for kind and EKS; 102 unit tests; attack 15/15, chaos 2/2, verify-cluster on kind after the generalisation.
 
 **Not verified (cannot be without AWS):** everything about actual behaviour on EKS: plan/apply, IAM sufficiency (the scoped policy may be missing an action the modules call), node capacity on t3.medium, VPC CNI enforcement, Neon through the pooler, `deploy/eks/gvisor.sh` (never run), the external-DB branch of the chaos test, the OIDC trust conditions, Cloudflare deploy. Prices in `scripts/cost_estimate.py` are unverified constants except t3.medium (cross-checked).
+
+## Independent review (2026-11-16) and fixes
+
+A fresh agent with no knowledge of the build reviewed dispatcher, API, chart, Terraform, workflows and runner (read-only). I verified
+each finding against the code before acting. Details of what was fixed and what was accepted are in `docs/THREAT_MODEL.md`.
+- **High, fixed:** NUL byte in output wedged a run (and blocked the dispatcher loop); frame flood broke the insert; CI-role IAM escalation.
+- **Medium, fixed:** possible double execution after a vanished Job (`job_created_at`, Job TTL 1 h); no per-key limits, SSE cap or body
+  limit; admission policy gaps (images, node pool, runtime class, ephemeral containers); workflow teardown credentials, reaper destroying on
+  a failed check, account ids in issues.
+- **Low, fixed:** idempotency collisions, over-long keys, `Last-Event-ID` overflow, Job failure without a pod.
+- **Not fixed (documented):** see the threat model's accepted list.
+- **Docs that overclaimed, corrected:** per-key limits, "exactly once", expiry enforcement, the admission policy's coverage, IAM scope.
+  (`docs/HANDOFF.md` is the owner's file and was not edited; its API header and "Neon only" egress statement differ from the code.)
+- Regression tests: `tests/unit/test_review_fixes.py` (14 tests) plus two attack-suite tests.

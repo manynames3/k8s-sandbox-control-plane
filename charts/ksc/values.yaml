@@ -55,6 +55,8 @@ sandbox:
   # Where sandboxes may run (EKS: the tainted sandbox node group). Empty on kind.
   nodeSelector: {}
   tolerations: []
+  # Images a pod in the sandbox namespace may use (prefix match). The dispatcher's images are built from this repo.
+  allowedImagePrefixes: ["ksc/"]
   # RuntimeClass for sandbox pods (e.g. gvisor). Empty = the node default (runc).
   runtimeClassName: ""
   # Optional egress allowlist (CIDRs). Empty = fully denied. 169.254.0.0/16 is always excluded.

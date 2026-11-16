@@ -56,7 +56,7 @@ def test_job_lifecycle_fields():
     job, pod, _ = spec(timeout=45)
     js = job["spec"]
     assert js["backoffLimit"] == 0 and pod["restartPolicy"] == "Never"
-    assert js["ttlSecondsAfterFinished"] == 120
+    assert js["ttlSecondsAfterFinished"] == 3600
     assert js["activeDeadlineSeconds"] == 45 + 30
     assert pod["terminationGracePeriodSeconds"] == 5
 

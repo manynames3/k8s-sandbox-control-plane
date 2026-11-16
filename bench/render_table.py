@@ -43,7 +43,8 @@ def render() -> str:
         lines += [
             f"**{env}**, measured {d['date']} at `{d['git_sha']}`{' (uncommitted changes)' if d.get('git_dirty') else ''}. "
             f"Kubernetes {d['kubernetes_version']}, {d['container_runtime']}, {d['worker_nodes']} workers, "
-            f"concurrency cap {d['concurrency_cap']}, VM {vm.get('cpus', 'n/a')} CPU / {mem}. "
+            f"concurrency cap {d['concurrency_cap']}, VM {vm.get('cpus', 'n/a')} CPU / {mem}"
+            f"{', Prometheus/Grafana running alongside' if d.get('monitoring_stack_running') else ''}. "
             f"Workload: {d['workload']}. Source: [`{d['_file']}`]({d['_file']}).",
             "",
             "| client concurrency | runs | succeeded | queue wait p50 / p95 / p99 (s) | schedule p50 / p95 / p99 (s) | end-to-end p50 / p95 / p99 (s) | throughput (runs/s) |",

@@ -97,7 +97,7 @@ def build_job(run_id: str, language: str, timeout_seconds: int, s: SandboxSettin
         "metadata": {"name": name, "namespace": s.namespace, "labels": labels(run_id)},
         "spec": {
             "backoffLimit": 0,
-            "ttlSecondsAfterFinished": 120,
+            "ttlSecondsAfterFinished": 3600,  # the dispatcher deletes it long before; this is only a backstop
             "activeDeadlineSeconds": timeout_seconds + DEADLINE_GRACE,
             "template": {"metadata": {"labels": labels(run_id)}, "spec": pod_spec},
         },

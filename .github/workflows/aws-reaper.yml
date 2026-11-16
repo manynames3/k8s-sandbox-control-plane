@@ -43,11 +43,17 @@ jobs:
       - name: Anything past its expiry?
         id: expired
         if: steps.configured.outputs.yes == 'true'
-        run: bash scripts/aws_orphans.sh expired | tee expired.txt
+        run: |
+          set +e
+          bash scripts/aws_orphans.sh expired | tee expired.txt
+          rc=${PIPESTATUS[0]}
+          # 1 = found (reap); 2 = the check itself failed: fail the run but never destroy on an error
+          [ "$rc" = 1 ] && echo "found=true" >> "$GITHUB_OUTPUT"
+          exit $(( rc == 1 ? 0 : rc ))
 
       - name: Destroy the stack
         id: destroy
-        if: always() && steps.expired.outcome == 'failure'
+        if: steps.expired.outputs.found == 'true'
         working-directory: infra/eks
         run: |
           terraform init -input=false \
@@ -59,14 +65,14 @@ jobs:
 
       - name: Anything still left after the destroy?
         id: after
-        if: always() && steps.expired.outcome == 'failure'
+        if: steps.expired.outputs.found == 'true'
         run: sleep 30; bash scripts/aws_orphans.sh list | tee after.txt
 
       - name: Open an issue
-        if: always() && steps.expired.outcome == 'failure'
+        if: steps.expired.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           left="$( [ -f after.txt ] && cat after.txt || echo 'unknown' )"
           gh issue create --title "aws-reaper found expired resources" --label bug \
-            --body "$(printf 'Resources tagged project=ksc were past their expires-at.\n\nExpired:\n```\n%s\n```\n\nDestroy outcome: %s\nStill present afterwards:\n```\n%s\n```\nRun: %s' "$(cat expired.txt)" "${{ steps.destroy.outcome }}" "$left" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"
+            --body "$(printf 'Resources tagged project=ksc were past their expires-at.\n\nExpired:\n```\n%s\n```\n\nDestroy outcome: %s\nStill present afterwards:\n```\n%s\n```\nRun: %s' "$(sed -E 's/[0-9]{12}/<account>/g' expired.txt)" "${{ steps.destroy.outcome }}" "$(printf '%s' "$left" | sed -E 's/[0-9]{12}/<account>/g')" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"

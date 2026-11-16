@@ -128,6 +128,21 @@ module "eks" {
         sandbox = { key = "ksc.dev/sandbox", value = "true", effect = "NO_SCHEDULE" }
       }
 
+      # Fork-bomb containment, as on kind: cap the processes per pod at 256 through the AL2023 node config.
+      # tests/attack asserts this (the fork count must stop below 256 with EAGAIN).
+      cloudinit_pre_nodeadm = [{
+        content_type = "application/node.eks.aws"
+        content      = <<-EOT
+          ---
+          apiVersion: node.eks.aws/v1alpha1
+          kind: NodeConfig
+          spec:
+            kubelet:
+              config:
+                podPidsLimit: 256
+        EOT
+      }]
+
       # IMDSv2 required with a hop limit of 1: a pod's extra network hop means it cannot reach the
       # instance metadata service, so it cannot read the node's credentials.
       metadata_options = {

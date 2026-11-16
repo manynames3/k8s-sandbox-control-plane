@@ -3,3 +3,7 @@ postgres:
   enabled: true
 keda:
   enabled: true
+
+sandbox:
+  # busybox is the image of the test probes (verify-cluster, the attack and e2e suites), pinned by tag
+  allowedImagePrefixes: ["ksc/", "busybox:1.36"]

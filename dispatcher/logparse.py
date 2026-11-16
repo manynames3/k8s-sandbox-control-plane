@@ -5,6 +5,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 
+def clean(text: str) -> str:
+    """Postgres rejects U+0000 in text and jsonb; a program can print NUL bytes, so replace them.
+    (Without this one run could make every database write for it fail on every tick.)"""
+    return text.replace("\x00", "\ufffd")
+
+
 @dataclass
 class ParsedLogs:
     stdout: str = ""
@@ -33,8 +39,8 @@ def parse(raw: str, max_bytes: int = 1024 * 1024) -> ParsedLogs:
         elif kind == "meta":
             res.truncated = res.truncated or bool(obj.get("truncated"))
             res.timeout = res.timeout or bool(obj.get("timeout"))
-    res.stdout = out.decode("utf-8", errors="replace")
-    res.stderr = err.decode("utf-8", errors="replace")
+    res.stdout = clean(out.decode("utf-8", errors="replace"))
+    res.stderr = clean(err.decode("utf-8", errors="replace"))
     return res
 
 
@@ -52,5 +58,5 @@ def iter_chunks(lines: list[str], start: int = 0) -> Iterator[tuple[int, str, st
         except json.JSONDecodeError:
             continue
         if obj.get("s") in ("out", "err"):
-            text = base64.b64decode(obj.get("b", "")).decode("utf-8", errors="replace")
+            text = clean(base64.b64decode(obj.get("b", "")).decode("utf-8", errors="replace"))
             yield n, "stdout" if obj["s"] == "out" else "stderr", text

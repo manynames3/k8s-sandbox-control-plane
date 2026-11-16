@@ -1,25 +1,28 @@
 import base64
 import json
 import os
+import threading
 import time
 import uuid
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from api import metrics as api_metrics
 from api import states
 from api.auth import require_key
 from api.db import get_engine
-from api.models import ClusterState, Run, RunEvent
+from api.models import ApiKey, ClusterState, Run, RunEvent
 from api.schemas import (
     MAX_CODE_BYTES,
     SUPPORTED,
@@ -46,6 +49,30 @@ app.add_middleware(
 )
 
 
+MAX_BODY_BYTES = 4 * 1024 * 1024  # a batch of 20 runs of 64 KiB code plus stdin fits well inside this
+
+
+class BodyLimitMiddleware:
+    """FastAPI reads the whole body before authentication runs, so bound it first. Requests that declare no
+    length (chunked uploads) are refused for writes."""
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        self.app, self.max_bytes = app, max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope["method"] in ("POST", "PUT", "PATCH"):
+            length = dict(scope["headers"]).get(b"content-length")
+            if length is None or not length.isdigit():
+                resp = JSONResponse({"detail": "Content-Length required"}, status_code=411)
+                return await resp(scope, receive, send)
+            if int(length) > self.max_bytes:
+                resp = JSONResponse({"detail": f"body exceeds {self.max_bytes} bytes"}, status_code=413)
+                return await resp(scope, receive, send)
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(BodyLimitMiddleware, max_bytes=MAX_BODY_BYTES)
+
 _registry = CollectorRegistry()
 _registry.register(api_metrics.DbCollector())
 
@@ -58,7 +85,7 @@ def metrics() -> Response:
 
 
 @app.get("/healthz")
-def healthz() -> dict[str, str]:
+async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
@@ -81,9 +108,27 @@ def validate(body: RunCreate) -> None:
         raise HTTPException(422, f"code exceeds {MAX_CODE_BYTES} bytes")
 
 
+def enforce_limits(s: Session, key_id: uuid.UUID, n: int) -> None:
+    """Per-key submission rate and in-flight (queued + active) cap. 429 when exceeded."""
+    key = s.get(ApiKey, key_id)
+    assert key is not None
+    recent = s.scalar(select(func.count()).select_from(Run).where(
+        Run.api_key_id == key_id, Run.created_at > datetime.now(UTC) - timedelta(seconds=60))) or 0
+    inflight = s.scalar(select(func.count()).select_from(Run).where(
+        Run.api_key_id == key_id,
+        Run.status.in_([states.QUEUED, states.DISPATCHING, states.RUNNING]))) or 0
+    if recent + n > key.rate_limit_per_min:
+        raise HTTPException(429, f"rate limit: {key.rate_limit_per_min} runs per minute", headers={"Retry-After": "10"})
+    if inflight + n > key.concurrency_cap:
+        raise HTTPException(429, f"{inflight} runs already queued or running; the limit is {key.concurrency_cap}",
+                            headers={"Retry-After": "5"})
+
+
 def insert_run(s: Session, key_id: uuid.UUID, body: RunCreate, idem: str | None) -> Run:
     """Insert one run (its own queue entry) or return the existing one for a repeated key."""
     validate(body)
+    if idem is not None and not 1 <= len(idem) <= 200:
+        raise HTTPException(422, "Idempotency-Key must be 1 to 200 characters")
     run_id = uuid.uuid4()
     stmt = (
         insert(Run)
@@ -112,6 +157,7 @@ def create_run(
     idempotency_key: str | None = Header(default=None),
 ) -> Run:
     with Session(get_engine(), expire_on_commit=False) as s, s.begin():
+        enforce_limits(s, key_id, 1)
         return insert_run(s, key_id, body, idempotency_key)
 
 
@@ -124,7 +170,9 @@ def create_batch(
     """Up to 20 runs in one transaction: all are queued or none. With an Idempotency-Key, run i
     uses the key '<key>:<i>', so retrying the whole batch returns the same runs."""
     with Session(get_engine(), expire_on_commit=False) as s, s.begin():
-        runs = [insert_run(s, key_id, r, f"{idempotency_key}:{i}" if idempotency_key else None)
+        enforce_limits(s, key_id, len(body.runs))
+        # 'batch:' keeps these keys apart from single-run keys (a single key "a:1" must not collide with item 1 of batch "a")
+        runs = [insert_run(s, key_id, r, f"batch:{idempotency_key}:{i}" if idempotency_key else None)
                 for i, r in enumerate(body.runs)]
         return BatchOut(runs=[RunOut.model_validate(r) for r in runs])
 
@@ -151,6 +199,24 @@ def cancel_run(run_id: uuid.UUID, key_id: uuid.UUID = Depends(require_key)) -> R
             run.finished_at = datetime.now(UTC)
             s.add(RunEvent(run_id=run.id, kind="state", data={"status": "cancelled"}))
         return run  # already terminal: cancelling again is a no-op
+
+
+MAX_STREAMS_PER_KEY = 8  # each stream holds a worker thread for its whole life
+_streams: dict[uuid.UUID, int] = {}
+_streams_lock = threading.Lock()
+
+
+def _acquire_stream(key_id: uuid.UUID) -> bool:
+    with _streams_lock:
+        if _streams.get(key_id, 0) >= MAX_STREAMS_PER_KEY:
+            return False
+        _streams[key_id] = _streams.get(key_id, 0) + 1
+        return True
+
+
+def _release_stream(key_id: uuid.UUID) -> None:
+    with _streams_lock:
+        _streams[key_id] = max(_streams.get(key_id, 1) - 1, 0)
 
 
 SSE_POLL_SECONDS = 0.5
@@ -201,9 +267,13 @@ def run_events(
         run = s.get(Run, run_id)
         if run is None or run.api_key_id != key_id:
             raise HTTPException(404, "run not found")
-    start = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
+    start = int(last_event_id) if last_event_id and last_event_id.isdigit() and len(last_event_id) < 18 else 0
+    if not _acquire_stream(key_id):
+        raise HTTPException(429, f"at most {MAX_STREAMS_PER_KEY} event streams per key",
+                            headers={"Retry-After": "5"})
     return StreamingResponse(sse_stream(run_id, start), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+                             background=BackgroundTask(_release_stream, key_id))
 
 
 def _encode_cursor(run: Run) -> str:

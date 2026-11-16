@@ -12,7 +12,7 @@ spec:
       - apiGroups: [""]
         apiVersions: ["v1"]
         operations: ["CREATE", "UPDATE"]
-        resources: ["pods"]
+        resources: ["pods", "pods/ephemeralcontainers"]
   validations:
     - expression: >-
         object.spec.containers.all(c, has(c.securityContext) &&
@@ -34,6 +34,26 @@ spec:
         !has(object.spec.volumes) || object.spec.volumes.all(v, has(v.configMap) || has(v.emptyDir))
       message: "only configMap and emptyDir volumes are allowed"
       reason: Forbidden
+    - expression: >-
+        object.spec.containers.all(c, {{ .Values.sandbox.allowedImagePrefixes | toJson }}.exists(p, c.image.startsWith(p)))
+      message: "container images must come from the allowed registries ({{ join ", " .Values.sandbox.allowedImagePrefixes }})"
+      reason: Forbidden
+    - expression: >-
+        !has(object.spec.ephemeralContainers) || size(object.spec.ephemeralContainers) == 0
+      message: "ephemeral containers (kubectl debug) are not allowed in the sandbox namespace"
+      reason: Forbidden
+    {{- range $k, $v := .Values.sandbox.nodeSelector }}
+    - expression: >-
+        has(object.spec.nodeSelector) && '{{ $k }}' in object.spec.nodeSelector && object.spec.nodeSelector['{{ $k }}'] == '{{ $v }}'
+      message: "pods must select the sandbox node pool ({{ $k }}={{ $v }}); they may not run next to the trusted components"
+      reason: Forbidden
+    {{- end }}
+    {{- if .Values.sandbox.runtimeClassName }}
+    - expression: >-
+        has(object.spec.runtimeClassName) && object.spec.runtimeClassName == '{{ .Values.sandbox.runtimeClassName }}'
+      message: "pods must use the {{ .Values.sandbox.runtimeClassName }} runtime class"
+      reason: Forbidden
+    {{- end }}
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding

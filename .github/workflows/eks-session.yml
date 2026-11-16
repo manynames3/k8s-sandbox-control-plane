@@ -187,8 +187,18 @@ jobs:
           if-no-files-found: ignore
 
       # ---- Always runs: tear everything down, then prove nothing is left.
+      # Credentials last 4 hours; a long session could have expired them by now, so take fresh ones.
+      - name: Fresh AWS credentials for the teardown
+        id: aws2
+        if: always() && steps.aws.outcome == 'success'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+
       - name: Terraform destroy
-        if: always() && steps.init.outcome == 'success'
+        if: always() && steps.init.outcome == 'success' && steps.aws2.outcome == 'success'
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           for attempt in 1 2 3; do
@@ -201,7 +211,7 @@ jobs:
 
       - name: Verify that nothing tagged project=ksc remains
         id: orphans
-        if: always() && steps.aws.outcome == 'success'
+        if: always() && steps.aws2.outcome == 'success'
         run: |
           sleep 30   # tag index lag
           bash scripts/aws_orphans.sh list | tee orphans.txt
@@ -212,4 +222,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh issue create --title "EKS session left resources behind" \
-            --label bug --body "$(printf 'The post-destroy check found resources tagged project=ksc. They bill until deleted.\n\nRun: %s\n\n```\n%s\n```\n\nThe aws-reaper workflow will also try to destroy them.' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$(cat orphans.txt)")"
+            --label bug --body "$(printf 'The post-destroy check found resources tagged project=ksc. They bill until deleted.\n\nRun: %s\n\n```\n%s\n```\n\nThe aws-reaper workflow will also try to destroy them.' "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$(sed -E 's/[0-9]{12}/<account>/g' orphans.txt)")"

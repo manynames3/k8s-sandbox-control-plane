@@ -60,12 +60,14 @@ The CI role (`infra/bootstrap/main.tf`) is scoped to what the EKS stack needs:
 | S3 read/write | the state bucket's `eks/` prefix | Terraform state and its lock file |
 | `ec2:*` | region-limited | VPC, subnets, security groups, launch templates, instances |
 | `eks:*` | region-limited | the cluster, add-ons, node groups, access entries |
-| IAM role/policy management | only names `ksc-session-*` | the cluster and node roles (names are fixed in `infra/eks` so this scoping works) |
+| IAM role management (create, delete, tag, read) | only names `ksc-session-*` | the cluster and node roles (names are fixed in `infra/eks` so this scoping works). `iam:PutRolePolicy` and `iam:UpdateAssumeRolePolicy` are **deliberately not granted** (see below) |
 | `iam:AttachRolePolicy` | only six named AWS managed policies | EKS cluster, VPC resource controller, worker node, ECR read, CNI |
 | `iam:PassRole` | only those roles, only to EKS and EC2 | no escalation to other services |
 | Service-linked roles | EKS, node group, autoscaling | created on first use |
 | `ssm:GetParameter` | `/aws/service/eks/*` | node AMI lookup |
 | read-only helpers | `*` | `autoscaling:Describe*`, tag lookup for the orphan check |
+
+**Escalation path that was closed:** the first version granted `iam:PutRolePolicy` and `iam:UpdateAssumeRolePolicy`, which would have let code running in the session create a `ksc-session-*` role with an `Action: *` inline policy and a trust policy naming the CI role, then assume it (an escalation to account admin). Found by the independent review. Without them a role created here can carry only the six managed policies above. If the first apply fails with `AccessDenied` on one of these, decide consciously before adding it back (a permissions boundary is the safer way).
 
 **Honest breadth:** `ec2:*` and `eks:*` are wide even though they are limited to one region. Resource-level scoping is
 not practical for the many resources the modules create. The role can only be assumed by this repository's session

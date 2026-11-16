@@ -192,8 +192,12 @@ data "aws_iam_policy_document" "ci" {
     sid = "ManageSessionRoles"
     actions = [
       "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:TagRole", "iam:UntagRole", "iam:UpdateRole",
-      "iam:UpdateAssumeRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies",
-      "iam:ListInstanceProfilesForRole", "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+      "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
+      "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+      # Deliberately absent: iam:PutRolePolicy and iam:UpdateAssumeRolePolicy. With them, code running in the
+      # session could create ksc-session-x with an inline Action:* policy and a trust policy naming this role, then
+      # assume it (an escalation to account admin). Without them a role created here can only carry the six managed
+      # policies listed below. If an apply fails with AccessDenied on one of these, decide consciously before adding it.
     ]
     resources = ["${local.role_prefix}-*"]
   }

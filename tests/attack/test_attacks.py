@@ -224,6 +224,18 @@ def test_unbounded_output_is_truncated_and_dispatcher_memory_stays_flat(client):
     assert after - before < 50 * 1024, f"dispatcher RSS grew {after - before} kB"
 
 
+def test_nul_bytes_in_output_cannot_wedge_the_dispatcher(client):
+    """Found by the independent review: Postgres rejects U+0000, so one run printing a NUL byte used to make every
+    database write for it fail on every tick, holding a slot until the sweeper fired."""
+    poison = submit(client, "import sys\nsys.stdout.buffer.write(bytes([97, 0, 98]))", timeout=20)
+    healthy = submit(client, "print('still here')")
+    res = wait_terminal(client, poison, timeout=60)
+    assert res["status"] == "succeeded" and "a" in res["stdout"] and "b" in res["stdout"] and "\x00" not in res["stdout"]
+    other = wait_terminal(client, healthy, timeout=60)
+    assert other["status"] == "succeeded" and other["stdout"] == "still here\n"
+    assert_cleaned_up(poison)
+
+
 # --- isolation between runs and from the kernel -----------------------------------------------
 
 def test_cannot_find_another_concurrent_runs_code_or_files(client):
@@ -343,6 +355,11 @@ def test_policy_denies_writable_rootfs_and_token_even_when_psa_passes():
     assert rw.returncode != 0 and "ksc-sandbox-pod-guardrails" in rw.stderr, rw.stderr
     tok = apply(POD.format(name="evil-token", automount="true", extra="", rofs="true"))
     assert tok.returncode != 0 and "ksc-sandbox-pod-guardrails" in tok.stderr, tok.stderr
+
+
+def test_policy_denies_images_from_unapproved_registries():
+    r = apply(POD.format(name="evil-image", automount="false", extra="", rofs="true").replace("busybox:1.36", "alpine:3.20"))
+    assert r.returncode != 0 and "allowed registries" in r.stderr, r.stderr
 
 
 def test_nothing_the_attacks_applied_was_created():

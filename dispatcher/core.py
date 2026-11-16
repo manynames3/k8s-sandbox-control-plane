@@ -28,6 +28,9 @@ SWEEP_LOCK_KEY = 0x6B7363_0002
 RETENTION_LOCK_KEY = 0x6B7363_0003
 MAX_LOG_READ = 4 * 1024 * 1024  # raw bytes read from the log API (framing overhead included)
 MAX_STREAM = 1024 * 1024
+MAX_CHUNK_ROWS = 4000      # output frames stored per run (the full output stays on the run row)
+INSERT_BATCH = 500         # rows per INSERT (stays far below the driver's parameter limit)
+MAX_RUN_FAILURES = 5       # consecutive failures handling one run before it is failed as infra_error
 IMAGE_ERRORS = frozenset({"ErrImagePull", "ImagePullBackOff", "InvalidImageName",
                           "CreateContainerConfigError", "CreateContainerError"})
 
@@ -94,6 +97,9 @@ def dispatch(engine: Engine, kube: Kube, c: Claimed, sandbox: podspec.SandboxSet
     job = podspec.build_job(c.id, c.language, c.timeout_seconds, sandbox)
     try:
         kube.ensure_run(c.id, job, c.code, c.stdin, c.language)
+        # From here on a missing Job means "it may have run": reconcile must never re-queue it.
+        with Session(engine) as s, s.begin():
+            s.execute(update(Run).where(Run.id == uuid.UUID(c.id)).values(job_created_at=_now()))
     except Exception as e:  # noqa: BLE001 - any failure to create must not strand the run
         metrics.k8s_api_errors["ensure_run"] += 1
         log.warning("dispatch failed, re-queueing", extra={"run_id": c.id, "error": str(e)})
@@ -133,10 +139,10 @@ def persist_chunks(engine: Engine, run_id: str, raw: str) -> None:
     lines = logparse.complete_lines(raw)
     start = _streamed.get(run_id, 0)
     rows = [{"run_id": uuid.UUID(run_id), "kind": kind, "data": {"text": text, "line": n}}
-            for n, kind, text in logparse.iter_chunks(lines, start)]
-    if rows:
+            for n, kind, text in logparse.iter_chunks(lines, start) if n < MAX_CHUNK_ROWS]
+    for i in range(0, len(rows), INSERT_BATCH):
         with Session(engine) as s, s.begin():
-            s.execute(pg_insert(RunEvent).values(rows).on_conflict_do_nothing())
+            s.execute(pg_insert(RunEvent).values(rows[i:i + INSERT_BATCH]).on_conflict_do_nothing())
     _streamed[run_id] = len(lines)
 
 
@@ -188,28 +194,52 @@ def observe(engine: Engine, kube: Kube, timing: Timing, now: datetime | None = N
     if not live:
         return
     pods = kube.list_pods()
-    jobs = None
+    jobs: dict[str | None, Any] | None = None
     for run_id, (status, dispatched_at) in live.items():
-        pod = pods.get(run_id)
-        age = (now - dispatched_at).total_seconds() if dispatched_at else 0.0
-        if pod is None:
-            if jobs is None:
-                jobs = {o.run_id: o for o in kube.list_objects() if o.kind == "jobs"}
-            job = jobs.get(run_id)
-            if job and job.failed_reason == "DeadlineExceeded":
-                fail_run(engine, kube, run_id, "timed_out", "deadline_exceeded")
-            continue  # otherwise reconcile decides
-        if pod.phase in ("Succeeded", "Failed"):
-            finalize(engine, kube, run_id, pod)
-        elif pod.phase == "Running":
-            if status == states.DISPATCHING:
-                _transition(engine, run_id, states.RUNNING, node=pod.node, started_at=pod.started_at)
-            stream_logs(engine, kube, run_id, pod)
-        elif pod.phase == "Pending":
-            if pod.waiting_reason in IMAGE_ERRORS and age > timing.image_error_after:
-                fail_run(engine, kube, run_id, "infra_error", "image_error")
-            elif age > timing.schedule_after:
-                fail_run(engine, kube, run_id, "infra_error", "schedule_timeout")
+        try:
+            pod = pods.get(run_id)
+            age = (now - dispatched_at).total_seconds() if dispatched_at else 0.0
+            if pod is None:
+                if jobs is None:
+                    jobs = {o.run_id: o for o in kube.list_objects() if o.kind == "jobs"}
+                job = jobs.get(run_id)
+                if job and job.failed_reason == "DeadlineExceeded":
+                    fail_run(engine, kube, run_id, "timed_out", "deadline_exceeded")
+                elif job and job.failed_reason:  # e.g. BackoffLimitExceeded with no pod left to read
+                    fail_run(engine, kube, run_id, "infra_error", "job_failed")
+                _failures.pop(run_id, None)
+                continue  # otherwise reconcile decides
+            if pod.phase in ("Succeeded", "Failed"):
+                finalize(engine, kube, run_id, pod)
+            elif pod.phase == "Running":
+                if status == states.DISPATCHING:
+                    _transition(engine, run_id, states.RUNNING, node=pod.node, started_at=pod.started_at)
+                stream_logs(engine, kube, run_id, pod)
+            elif pod.phase == "Pending":
+                if pod.waiting_reason in IMAGE_ERRORS and age > timing.image_error_after:
+                    fail_run(engine, kube, run_id, "infra_error", "image_error")
+                elif age > timing.schedule_after:
+                    fail_run(engine, kube, run_id, "infra_error", "schedule_timeout")
+            _failures.pop(run_id, None)
+        except Exception:  # noqa: BLE001 - one bad run must never stop the others being handled
+            _handle_run_failure(engine, kube, run_id)
+
+
+_failures: dict[str, int] = {}
+
+
+def _handle_run_failure(engine: Engine, kube: Kube, run_id: str) -> None:
+    """Isolate a failure to its own run. After MAX_RUN_FAILURES in a row the run is failed as an
+    infrastructure error and its sandbox removed, so it cannot occupy a slot until the sweeper fires."""
+    _failures[run_id] = _failures.get(run_id, 0) + 1
+    metrics.k8s_api_errors["observe_run"] += 1
+    log.exception("handling run failed", extra={"run_id": run_id, "error": f"attempt {_failures[run_id]}"})
+    if _failures[run_id] >= MAX_RUN_FAILURES:
+        try:
+            fail_run(engine, kube, run_id, "infra_error", "dispatcher_error")
+            _failures.pop(run_id, None)
+        except Exception:
+            log.exception("could not fail run", extra={"run_id": run_id})
 
 
 def _uuid_or_none(v: str | None) -> uuid.UUID | None:
@@ -239,7 +269,7 @@ def reconcile(engine: Engine, kube: Kube, timing: Timing, now: datetime | None =
             continue
         if run.dispatched_at and (now - run.dispatched_at).total_seconds() < timing.requeue_grace:
             continue
-        if run.status == states.DISPATCHING and run.started_at is None:
+        if run.status == states.DISPATCHING and run.started_at is None and run.job_created_at is None:
             if _transition(engine, str(rid), states.QUEUED):
                 metrics.reconcile_corrections["requeue_no_job"] += 1
                 log.warning("run had no job, re-queued", extra={"run_id": str(rid)})
@@ -326,5 +356,7 @@ def tick(engine: Engine, kube: Kube, cap: int, sandbox: podspec.SandboxSettings,
          timing: Timing = Timing()) -> None:
     for c in claim(engine, cap):
         dispatch(engine, kube, c, sandbox)
-    observe(engine, kube, timing)
-    reconcile(engine, kube, timing)
+    try:
+        observe(engine, kube, timing)
+    finally:
+        reconcile(engine, kube, timing)  # runs even when observing failed
