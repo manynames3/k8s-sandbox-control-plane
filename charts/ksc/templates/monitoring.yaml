@@ -1,0 +1,65 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ksc-api
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  selector: {matchLabels: {app: ksc-api}}
+  endpoints: [{port: http, path: /metrics, interval: 15s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ksc-dispatcher
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  selector: {matchLabels: {app: ksc-dispatcher}}
+  endpoints: [{port: metrics, interval: 15s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ksc-alerts
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  groups:
+    - name: ksc
+      rules:
+        - alert: KscQueueWaitP95High
+          expr: histogram_quantile(0.95, sum by (le) (rate(ksc_run_queue_wait_seconds_bucket[5m]))) > {{ .Values.monitoring.alerts.queueWaitP95Seconds }}
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "Run queue wait p95 is above {{ .Values.monitoring.alerts.queueWaitP95Seconds }}s"
+            description: {{ `"p95 queue wait is {{ $value | printf \"%.1f\" }}s over the last 5m"` }}
+            runbook: docs/RUNBOOK.md#kscqueuewaitp95high
+        - alert: KscSandboxOverdue
+          expr: sum(increase(ksc_sweeper_deletions_total[10m])) > 0
+          labels: {severity: critical}
+          annotations:
+            summary: "A sandbox outlived its timeout + 5 minutes and the sweeper had to delete it"
+            description: "An earlier cleanup layer (wrapper timeout, job deadline, reconcile) failed."
+            runbook: docs/RUNBOOK.md#kscsandboxoverdue
+        - alert: KscInfraErrorRatioHigh
+          expr: >-
+            sum(increase(ksc_runs_finished_total{status="infra_error"}[15m]))
+            / sum(increase(ksc_runs_finished_total[15m])) > {{ .Values.monitoring.alerts.infraErrorRatio }}
+          for: 10m
+          labels: {severity: critical}
+          annotations:
+            summary: "infra_error ratio is above {{ .Values.monitoring.alerts.infraErrorRatio }} (the SLO allows 1%)"
+            description: {{ `"{{ $value | humanizePercentage }} of runs ended in infra_error over 15m"` }}
+            runbook: docs/RUNBOOK.md#kscinfraerrorratiohigh
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ksc-dashboard
+  namespace: {{ .Values.systemNamespace }}
+  labels:
+    grafana_dashboard: "1"     # picked up by the Grafana sidecar
+data:
+  ksc.json: |-
+    {{- .Files.Get "dashboards/ksc.json" | nindent 4 }}
+{{- end }}

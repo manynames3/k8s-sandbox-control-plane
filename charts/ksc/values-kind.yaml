@@ -1,3 +1,5 @@
 concurrencyCap: 4
 postgres:
   enabled: true
+keda:
+  enabled: true

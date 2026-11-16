@@ -9,11 +9,13 @@ from datetime import UTC, datetime
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from api import metrics as api_metrics
 from api import states
 from api.auth import require_key
 from api.db import get_engine
@@ -42,6 +44,17 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Last-Event-ID"],
 )
+
+
+_registry = CollectorRegistry()
+_registry.register(api_metrics.DbCollector())
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+    """Prometheus scrape endpoint. Unauthenticated by design: it is cluster-internal (the API is never
+    exposed beyond localhost) and carries counts and timings only, never code or output."""
+    return Response(generate_latest(_registry), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/healthz")

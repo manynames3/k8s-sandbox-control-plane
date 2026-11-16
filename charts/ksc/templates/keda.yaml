@@ -1,0 +1,53 @@
+{{- if .Values.keda.enabled }}
+{{- $secret := ternary "ksc-postgres" .Values.postgres.externalUrlSecret .Values.postgres.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: ksc-postgres-auth
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  secretTargetRef:
+    - parameter: connection
+      name: {{ $secret }}
+      key: KEDA_CONNECTION      # plain postgresql:// URL (KEDA does not understand the +psycopg form)
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ksc-dispatcher
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  scaleTargetRef:
+    name: ksc-dispatcher
+  minReplicaCount: 1
+  maxReplicaCount: {{ .Values.keda.maxReplicas }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}   # only applies to scaling to zero (minReplicaCount is 1)
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:          # scaling N -> 1 is the HPA's job; its default window is 5 minutes
+          stabilizationWindowSeconds: {{ .Values.keda.scaleDownStabilizationSeconds }}
+  triggers:
+    - type: postgresql
+      authenticationRef: {name: ksc-postgres-auth}
+      metadata:
+        query: "SELECT count(*) FROM runs WHERE status = 'queued'"
+        targetQueryValue: {{ .Values.keda.queuedPerReplica | quote }}
+---
+# KEDA's operator (namespace keda) and Prometheus (namespace monitoring) must reach the trusted namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-keda-and-prometheus
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - {key: kubernetes.io/metadata.name, operator: In, values: [keda, monitoring]}
+      ports: [{port: 5432, protocol: TCP}, {port: 8080, protocol: TCP}, {port: 9100, protocol: TCP}]
+{{- end }}

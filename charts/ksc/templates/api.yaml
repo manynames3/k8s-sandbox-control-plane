@@ -51,6 +51,7 @@ kind: Service
 metadata:
   name: ksc-api
   namespace: {{ .Values.systemNamespace }}
+  labels: {app: ksc-api}
 spec:
   type: ClusterIP
   selector: {app: ksc-api}

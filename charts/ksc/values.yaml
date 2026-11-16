@@ -13,6 +13,22 @@ image:
 dispatcher:
   replicas: 1
 
+# KEDA scales dispatcher replicas on queued-run count (needs KEDA installed first).
+keda:
+  enabled: false
+  maxReplicas: 3
+  queuedPerReplica: 4     # one more dispatcher per this many queued runs
+  pollingInterval: 5
+  cooldownPeriod: 30
+  scaleDownStabilizationSeconds: 30
+
+# ServiceMonitor, PrometheusRule and Grafana dashboard (needs kube-prometheus-stack installed first).
+monitoring:
+  enabled: false
+  alerts:
+    queueWaitP95Seconds: 30
+    infraErrorRatio: 0.01
+
 # Worker node names, shown in the UI's cluster panel even while idle (make up fills this in).
 knownNodes: []
 

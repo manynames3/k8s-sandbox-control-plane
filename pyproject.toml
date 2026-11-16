@@ -10,6 +10,7 @@ dependencies = [
   "alembic>=1.14",
   "psycopg[binary]>=3.2",
   "kubernetes>=31",
+  "prometheus-client>=0.21",
 ]
 
 [dependency-groups]

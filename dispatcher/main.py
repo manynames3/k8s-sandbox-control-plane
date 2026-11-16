@@ -5,8 +5,10 @@ import signal
 import time
 from datetime import UTC, datetime
 
+from prometheus_client import start_http_server
+
 from api.db import get_engine
-from dispatcher import core, podspec
+from dispatcher import core, metrics, podspec
 from dispatcher.kube import RealKube
 
 
@@ -48,6 +50,7 @@ def main() -> None:
 
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
+    start_http_server(int(os.environ.get("METRICS_PORT", "9100")), registry=metrics.registry)
     logging.getLogger("ksc.dispatcher").info("dispatcher started")
     while not stop:
         try:

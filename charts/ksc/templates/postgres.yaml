@@ -11,6 +11,7 @@ type: Opaque
 stringData:
   password: {{ $pw | quote }}
   DATABASE_URL: {{ printf "postgresql+psycopg://ksc:%s@ksc-postgres:5432/ksc" $pw | quote }}
+  KEDA_CONNECTION: {{ printf "postgresql://ksc:%s@ksc-postgres.%s.svc:5432/ksc?sslmode=disable" $pw .Values.systemNamespace | quote }}
 ---
 apiVersion: v1
 kind: Service
