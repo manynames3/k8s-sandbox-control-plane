@@ -1,4 +1,4 @@
-.PHONY: doctor disk clean nuke up down test e2e attack chaos lint verify-cluster monitoring
+.PHONY: doctor disk clean nuke up down test e2e attack chaos lint verify-cluster monitoring bench
 WORKERS ?= 2
 CLUSTER ?= ksc
 IMAGE_API ?= ksc/api:dev
@@ -52,6 +52,9 @@ attack:
 
 chaos:
 	uv run pytest -v -m chaos tests/chaos
+
+bench:
+	uv run python bench/bench.py --runs 200 --concurrency 5 20
 
 lint:
 	uv run ruff check . && uv run mypy api dispatcher

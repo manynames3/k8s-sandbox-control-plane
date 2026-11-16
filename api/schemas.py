@@ -29,6 +29,7 @@ class RunOut(BaseModel):
     truncated: bool
     node: str | None
     created_at: datetime
+    dispatched_at: datetime | None
     started_at: datetime | None
     finished_at: datetime | None
 
@@ -53,6 +54,7 @@ class RunSummary(BaseModel):
     termination_reason: str | None
     node: str | None
     created_at: datetime
+    dispatched_at: datetime | None
     started_at: datetime | None
     finished_at: datetime | None
 

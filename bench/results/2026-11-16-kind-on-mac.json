@@ -1,0 +1,98 @@
+{
+  "date": "2026-11-16",
+  "timestamp": "2026-11-16T08:58:27+00:00",
+  "environment": "kind-on-mac",
+  "git_sha": "cd69f35",
+  "kubernetes_version": "v1.36.4",
+  "container_runtime": "containerd://2.3.4",
+  "node_os": "Debian GNU/Linux 13 (trixie)",
+  "worker_nodes": 2,
+  "concurrency_cap": 4,
+  "host": {
+    "arch": "arm64",
+    "system": "Darwin",
+    "cpus": 10
+  },
+  "vm": {
+    "cpus": 4,
+    "memory_bytes": 8589934592,
+    "disk_bytes": 64424509440
+  },
+  "monitoring_stack_running": true,
+  "dispatcher_replicas_at_start": "1",
+  "workload": "python3.12: sum of squares over 1.5M integers (~0.2 s CPU), 500m CPU / 512Mi limits",
+  "levels": [
+    {
+      "concurrency": 5,
+      "sample_size": 200,
+      "statuses": {
+        "succeeded": 200
+      },
+      "infra_error_ratio": 0.0,
+      "wall_seconds": 180.4,
+      "throughput_runs_per_second": 1.109,
+      "queue_wait_seconds": {
+        "p50": 1.193,
+        "p95": 2.741,
+        "p99": 3.038,
+        "max": 3.948
+      },
+      "schedule_seconds": {
+        "p50": 0.085,
+        "p95": 0.594,
+        "p99": 0.807,
+        "max": 0.883
+      },
+      "exec_seconds": {
+        "p50": 2.88,
+        "p95": 3.587,
+        "p99": 3.728,
+        "max": 3.977
+      },
+      "e2e_seconds": {
+        "p50": 4.293,
+        "p95": 5.478,
+        "p99": 6.187,
+        "max": 6.576
+      }
+    },
+    {
+      "concurrency": 20,
+      "sample_size": 200,
+      "statuses": {
+        "succeeded": 200
+      },
+      "infra_error_ratio": 0.0,
+      "wall_seconds": 157.8,
+      "throughput_runs_per_second": 1.267,
+      "queue_wait_seconds": {
+        "p50": 12.243,
+        "p95": 13.935,
+        "p99": 14.437,
+        "max": 14.786
+      },
+      "schedule_seconds": {
+        "p50": 0.261,
+        "p95": 0.749,
+        "p99": 0.993,
+        "max": 1.02
+      },
+      "exec_seconds": {
+        "p50": 2.595,
+        "p95": 3.362,
+        "p99": 3.516,
+        "max": 3.645
+      },
+      "e2e_seconds": {
+        "p50": 15.083,
+        "p95": 16.808,
+        "p99": 17.154,
+        "max": 17.87
+      }
+    }
+  ],
+  "cold_start": {
+    "measured": false,
+    "reason": "kind loads images into nodes; pulled-versus-pre-pulled needs a registry (EKS session)"
+  }
+}
