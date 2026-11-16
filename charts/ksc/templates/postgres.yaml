@@ -1,0 +1,60 @@
+{{- if .Values.postgres.enabled }}
+{{- $existing := lookup "v1" "Secret" .Values.systemNamespace "ksc-postgres" }}
+{{- $pw := randAlphaNum 24 }}
+{{- if $existing }}{{ $pw = index $existing.data "password" | b64dec }}{{ end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ksc-postgres
+  namespace: {{ .Values.systemNamespace }}
+type: Opaque
+stringData:
+  password: {{ $pw | quote }}
+  DATABASE_URL: {{ printf "postgresql+psycopg://ksc:%s@ksc-postgres:5432/ksc" $pw | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ksc-postgres
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  selector: {app: ksc-postgres}
+  ports: [{port: 5432, targetPort: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ksc-postgres
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  serviceName: ksc-postgres
+  replicas: 1
+  selector:
+    matchLabels: {app: ksc-postgres}
+  template:
+    metadata:
+      labels: {app: ksc-postgres}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          env:
+            - {name: POSTGRES_USER, value: ksc}
+            - {name: POSTGRES_DB, value: ksc}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: ksc-postgres, key: password}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports: [{containerPort: 5432}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "ksc", "-d", "ksc"]}
+            periodSeconds: 3
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 384Mi}
+          volumeMounts: [{name: data, mountPath: /var/lib/postgresql/data}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: {{ .Values.postgres.storage }}}}
+{{- end }}

@@ -1,0 +1,3 @@
+concurrencyCap: 4
+postgres:
+  enabled: true

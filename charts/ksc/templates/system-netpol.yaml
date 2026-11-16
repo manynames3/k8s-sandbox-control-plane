@@ -1,0 +1,22 @@
+# Trusted namespace: default-deny ingress, allow intra-namespace; egress limited to DNS, intra-namespace and the K8s API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: system-default
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {}}]
+  egress:
+    - to: [{podSelector: {}}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to: [{ipBlock: {cidr: {{ .Values.apiServerCidr }}}}]
+      ports:
+        {{- range .Values.apiServerPorts }}
+        - {port: {{ . }}, protocol: TCP}
+        {{- end }}

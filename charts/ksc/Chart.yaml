@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ksc
+description: k8s-sandbox-control-plane - API, dispatcher and sandbox guardrails
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

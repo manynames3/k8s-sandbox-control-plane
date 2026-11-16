@@ -1,0 +1,55 @@
+{{- $secret := ternary "ksc-postgres" .Values.postgres.externalUrlSecret .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ksc-api
+  namespace: {{ .Values.systemNamespace }}
+  labels: {{- include "ksc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ksc-api}
+  template:
+    metadata:
+      labels: {app: ksc-api}
+    spec:
+      serviceAccountName: ksc-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: migrate
+          image: {{ .Values.image.api }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sh", "-c", "for i in $(seq 1 30); do alembic -c api/alembic.ini upgrade head && exit 0; sleep 2; done; exit 1"]
+          envFrom: [{secretRef: {name: {{ $secret }}}}]
+          securityContext: &sc
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      containers:
+        - name: api
+          image: {{ .Values.image.api }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+          ports: [{containerPort: 8080, name: http}]
+          envFrom: [{secretRef: {name: {{ $secret }}}}]
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10}
+          securityContext: *sc
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ksc-api
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  type: ClusterIP
+  selector: {app: ksc-api}
+  ports: [{name: http, port: 8080, targetPort: http}]

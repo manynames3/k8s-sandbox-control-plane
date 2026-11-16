@@ -1,0 +1,60 @@
+# Dispatcher: namespaced Role in the sandbox namespace only. No cluster-wide access, no secrets.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ksc-dispatcher
+  namespace: {{ .Values.systemNamespace }}
+  labels: {{- include "ksc.labels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ksc-api
+  namespace: {{ .Values.systemNamespace }}
+  labels: {{- include "ksc.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Service account used by sandbox pods: zero RBAC, no token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox
+  namespace: {{ .Values.sandboxNamespace }}
+  labels: {{- include "ksc.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ksc-dispatcher
+  namespace: {{ .Values.sandboxNamespace }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ksc-dispatcher
+  namespace: {{ .Values.sandboxNamespace }}
+subjects:
+  - kind: ServiceAccount
+    name: ksc-dispatcher
+    namespace: {{ .Values.systemNamespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ksc-dispatcher

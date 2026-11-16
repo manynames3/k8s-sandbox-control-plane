@@ -1,0 +1,62 @@
+# Default deny for everything in the sandbox namespace, DNS included.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .Values.sandboxNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+{{- if .Values.sandbox.egressAllowCidrs }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-allowlist
+  namespace: {{ .Values.sandboxNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        {{- range .Values.sandbox.egressAllowCidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+            except: ["169.254.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+        {{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sandbox-quota
+  namespace: {{ .Values.sandboxNamespace }}
+spec:
+  hard:
+    pods: {{ .Values.concurrencyCap | quote }}
+    requests.cpu: {{ mul (int .Values.concurrencyCap) 1 | quote }}
+    requests.memory: {{ printf "%dGi" (int .Values.concurrencyCap) | quote }}
+    limits.cpu: {{ mul (int .Values.concurrencyCap) 1 | quote }}
+    limits.memory: {{ printf "%dGi" (int .Values.concurrencyCap) | quote }}
+    count/jobs.batch: {{ mul (int .Values.concurrencyCap) 2 | quote }}
+    count/configmaps: {{ mul (int .Values.concurrencyCap) 3 | quote }}
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sandbox-limits
+  namespace: {{ .Values.sandboxNamespace }}
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: {{ .Values.sandbox.defaultCpu }}
+        memory: {{ .Values.sandbox.defaultMemory }}
+        ephemeral-storage: {{ .Values.sandbox.ephemeralStorage }}
+      defaultRequest:
+        cpu: {{ .Values.sandbox.defaultCpu }}
+        memory: {{ .Values.sandbox.defaultMemory }}
+        ephemeral-storage: {{ .Values.sandbox.ephemeralStorage }}
+      max:
+        cpu: {{ .Values.sandbox.maxCpu }}
+        memory: {{ .Values.sandbox.maxMemory }}

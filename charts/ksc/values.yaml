@@ -1,0 +1,29 @@
+systemNamespace: ksc-system
+sandboxNamespace: sandboxes
+
+# Max concurrent sandboxes. ResourceQuota pod count equals this.
+concurrencyCap: 4
+
+image:
+  api: ksc/api:dev
+  pullPolicy: IfNotPresent
+
+postgres:
+  enabled: true            # in-cluster Postgres (local/CI). Off on EKS (Neon).
+  image: postgres:16-alpine
+  storage: 1Gi
+  # externalUrlSecret: name of an existing Secret with key DATABASE_URL when enabled=false
+  externalUrlSecret: ""
+
+sandbox:
+  defaultCpu: 500m
+  defaultMemory: 512Mi
+  maxMemory: 512Mi
+  maxCpu: 500m
+  ephemeralStorage: 128Mi
+  # Optional egress allowlist (CIDRs). Empty = fully denied. 169.254.0.0/16 is always excluded.
+  egressAllowCidrs: []
+
+# Kubernetes API server egress for the trusted namespace (kind: control-plane container IP).
+apiServerCidr: 0.0.0.0/0
+apiServerPorts: [6443, 443]
