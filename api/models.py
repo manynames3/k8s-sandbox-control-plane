@@ -73,3 +73,13 @@ class RunEvent(Base):
         Index("uq_run_events_line", "run_id", text("(data->>'line')"), unique=True,
               postgresql_where=text("kind IN ('stdout','stderr')")),
     )
+
+
+class ClusterState(Base):
+    """Single row written by the dispatcher (the only component that can see the cluster), read by
+    the API for /v1/cluster. The API itself has no Kubernetes access."""
+
+    __tablename__ = "cluster_state"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    data: Mapped[dict] = mapped_column(JSONB, default=dict)  # type: ignore[type-arg]
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

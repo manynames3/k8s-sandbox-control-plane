@@ -13,6 +13,9 @@ image:
 dispatcher:
   replicas: 1
 
+# Worker node names, shown in the UI's cluster panel even while idle (make up fills this in).
+knownNodes: []
+
 postgres:
   enabled: true            # in-cluster Postgres (local/CI). Off on EKS (Neon).
   image: postgres:16-alpine

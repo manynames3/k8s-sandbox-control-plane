@@ -26,5 +26,5 @@ def engine():
 @pytest.fixture
 def db(engine):
     with engine.begin() as c:
-        c.execute(text("TRUNCATE runs, run_events, api_keys CASCADE"))
+        c.execute(text("TRUNCATE runs, run_events, api_keys, cluster_state CASCADE"))
     return engine

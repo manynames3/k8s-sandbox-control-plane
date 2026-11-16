@@ -29,6 +29,7 @@ spec:
             - {name: SANDBOX_NAMESPACE, value: {{ .Values.sandboxNamespace | quote }}}
             - {name: CONCURRENCY_CAP, value: {{ .Values.concurrencyCap | quote }}}
             - {name: RUNNER_IMAGE_PYTHON, value: {{ .Values.image.runnerPython | quote }}}
+            - {name: KNOWN_NODES, value: {{ join "," .Values.knownNodes | quote }}}
             - {name: RUNNER_IMAGE_NODE, value: {{ .Values.image.runnerNode | quote }}}
           securityContext:
             allowPrivilegeEscalation: false

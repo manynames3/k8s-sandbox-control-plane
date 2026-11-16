@@ -37,6 +37,8 @@ spec:
           command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
           ports: [{containerPort: 8080, name: http}]
           envFrom: [{secretRef: {name: {{ $secret }}}}]
+          env:
+            - {name: CONCURRENCY_CAP, value: {{ .Values.concurrencyCap | quote }}}
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10}
           securityContext: *sc

@@ -41,3 +41,39 @@ class BatchCreate(BaseModel):
 
 class BatchOut(BaseModel):
     runs: list[RunOut]
+
+
+class RunSummary(BaseModel):
+    """List view: no code or output."""
+    id: uuid.UUID
+    language: str
+    status: str
+    timeout_seconds: int
+    exit_code: int | None
+    termination_reason: str | None
+    node: str | None
+    created_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+    model_config = {"from_attributes": True}
+
+
+class RunList(BaseModel):
+    runs: list[RunSummary]
+    next_cursor: str | None
+
+
+class NodeInfo(BaseModel):
+    name: str
+    active_sandboxes: int
+
+
+class ClusterOut(BaseModel):
+    concurrency_cap: int
+    queued: int
+    dispatching: int
+    running: int
+    free_slots: int
+    nodes: list[NodeInfo]
+    snapshot_age_seconds: float | None  # how stale the dispatcher's node view is

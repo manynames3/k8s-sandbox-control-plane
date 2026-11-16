@@ -38,6 +38,7 @@ def main() -> None:
         sweep_interval=float(os.environ.get("SWEEP_INTERVAL_SECONDS", "30")),
     )
     engine, kube = get_engine(), RealKube(ns)
+    known_nodes = [n for n in os.environ.get("KNOWN_NODES", "").split(",") if n]
     last_sweep = datetime.min.replace(tzinfo=UTC)
     stop = False
 
@@ -51,6 +52,7 @@ def main() -> None:
     while not stop:
         try:
             core.tick(engine, kube, cap, sandbox, timing)
+            core.publish_cluster(engine, kube, known_nodes)
             if (datetime.now(UTC) - last_sweep).total_seconds() >= timing.sweep_interval:
                 last_sweep = datetime.now(UTC)
                 core.sweep(engine, kube, timing)

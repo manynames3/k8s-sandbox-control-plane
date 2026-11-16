@@ -5,6 +5,7 @@ Cleanup layers, innermost first: (1) the wrapper timeout, (2) Job activeDeadline
 (3) reconcile (cluster object without a live run, or a live run without a cluster object),
 (4) the sweeper (age-based, ignores the database except for the run's timeout)."""
 import logging
+import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -16,7 +17,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from api import states
-from api.models import Run, RunEvent
+from api.models import ClusterState, Run, RunEvent
 from dispatcher import logparse, metrics, podspec
 from dispatcher.kube import Kube, PodInfo
 
@@ -280,6 +281,26 @@ def sweep(engine: Engine, kube: Kube, timing: Timing, now: datetime | None = Non
                 log.warning("sweeper deleted stale object",
                             extra={"run_id": o.run_id or "", "error": f"{o.kind}/{o.name}"})
     return deleted
+
+
+_last_snapshot = 0.0
+
+
+def publish_cluster(engine: Engine, kube: Kube, known_nodes: list[str], every: float = 2.0) -> None:
+    """Write the node view (active sandbox pods per node) for the API's /v1/cluster."""
+    global _last_snapshot
+    now = time.monotonic()
+    if now - _last_snapshot < every:
+        return
+    _last_snapshot = now
+    per_node: dict[str, int] = dict.fromkeys(known_nodes, 0)
+    for pod in kube.list_pods().values():
+        if pod.phase in ("Pending", "Running") and pod.node:
+            per_node[pod.node] = per_node.get(pod.node, 0) + 1
+    data = {"nodes": [{"name": n, "active_sandboxes": c} for n, c in sorted(per_node.items())]}
+    with Session(engine) as s, s.begin():
+        s.execute(pg_insert(ClusterState).values(id=1, data=data, updated_at=_now())
+                  .on_conflict_do_update(index_elements=["id"], set_={"data": data, "updated_at": _now()}))
 
 
 def tick(engine: Engine, kube: Kube, cap: int, sandbox: podspec.SandboxSettings,

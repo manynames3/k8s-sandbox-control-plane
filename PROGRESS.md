@@ -86,3 +86,15 @@
 **Done:** `node:20-slim` runner (digest-pinned, same wrapper protocol in `runner/ksc_run.js`); per-language code file in the ConfigMap; `POST /v1/runs:batch` (1-20, atomic, idempotent per item); dispatcher persists output chunks as events while the run is `running` (unique `(run_id, line)` index makes this replica- and restart-safe); `GET /v1/runs/{id}/events` SSE with `Last-Event-ID` resume; loop interval 0.5 s.
 **Found:** the Python wrapper used `read(4096)` on a buffered pipe, so output reached the log only at exit; fixed with `read1`. The SSE e2e test (logs arrive >4 s before an 8 s run ends) caught it.
 **Verified:** 69 unit, e2e incl. Node hello/exit/stdin/timeout/OOM, batch of 20 (cap never exceeded at any sample, both languages, ordered output), SSE (3/3 runs).
+
+## Phase 5c/5d — Web UI (live mode), cluster/list endpoints, MCP server (2026-11-16)
+
+**Done:**
+- `GET /v1/runs` (status/language filters, keyset cursor pagination, no code/output in the list), `GET /v1/cluster` (queue and slot counts live from the DB; node view from a snapshot the dispatcher writes, because the API has no Kubernetes access by design; worker names come from `make up` via Helm `knownNodes`), CORS limited to the local UI origins.
+- `web/`: Vite + React + TypeScript, 155 kB JS (50 kB gzipped). Editor, language, timeout, Run/Cancel, live log stream (fetch-based SSE reader so the API key can go in a header), status/exit/reason/duration/node, cluster panel, recent-runs table, eight "Try an attack" buttons with the healthy outcome shown. All data goes through a `DataSource` interface so replay mode (phase 7) reuses every screen.
+- MCP server `mcp/ksc_mcp_server.py` (MCP SDK 2.x, stdio): `run_code`, `submit_batch`, `get_run`, `cancel_run`; output returned to the agent is capped at 20,000 characters per stream and flagged.
+- `docs/agent-transcript.md`: a real one-shot `claude -p` session (haiku-5-5, only this MCP server attached) against the local cluster: primes in Python, a Node TCP connect to example.com (timed out), a write to /etc/hostname (errno 30).
+
+**Verified how:** 85 unit tests (list/pagination/filters/cluster/CORS/MCP tools with a faked API); e2e: MCP spawned over stdio exactly as an agent would (list tools, run Python and Node, failing run, batch, cancel) + cleanup proof; web typecheck, 3 vitest tests, production build; UI driven in a real browser against the live cluster (run streamed line by line, cluster panel showed the busy node and slot, network attack ran and every outbound attempt printed `closed:`).
+
+**Limits:** no browser automation suite for the UI (checked manually in a browser, not in CI); the UI has no screenshot tests; node view for an unknown node appears only once it hosts a sandbox.

@@ -42,10 +42,14 @@ def api_url():
 
 
 @pytest.fixture(scope="session")
-def client(api_url):
-    key = kubectl("-n", NS_SYS, "exec", "deploy/ksc-api", "--", "python", "-m", "api.keys",
-                  "create", f"e2e-{int(time.time())}")
-    with httpx.Client(base_url=api_url, headers={"Authorization": f"Bearer {key}"}, timeout=10) as c:
+def api_key():
+    return kubectl("-n", NS_SYS, "exec", "deploy/ksc-api", "--", "python", "-m", "api.keys",
+                   "create", f"e2e-{int(time.time())}")
+
+
+@pytest.fixture(scope="session")
+def client(api_url, api_key):
+    with httpx.Client(base_url=api_url, headers={"Authorization": f"Bearer {api_key}"}, timeout=10) as c:
         yield c
 
 

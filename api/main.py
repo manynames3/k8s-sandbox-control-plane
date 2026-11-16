@@ -1,12 +1,15 @@
+import base64
 import json
+import os
 import time
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -14,10 +17,31 @@ from sqlalchemy.orm import Session
 from api import states
 from api.auth import require_key
 from api.db import get_engine
-from api.models import Run, RunEvent
-from api.schemas import MAX_CODE_BYTES, SUPPORTED, BatchCreate, BatchOut, RunCreate, RunOut
+from api.models import ClusterState, Run, RunEvent
+from api.schemas import (
+    MAX_CODE_BYTES,
+    SUPPORTED,
+    BatchCreate,
+    BatchOut,
+    ClusterOut,
+    NodeInfo,
+    RunCreate,
+    RunList,
+    RunOut,
+    RunSummary,
+)
 
 app = FastAPI(title="k8s-sandbox-control-plane", version="0.1.0")
+# The UI runs from a local dev server in live mode; the API is never exposed beyond localhost.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.environ.get(
+        "KSC_CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173",
+    ).split(","),
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "Last-Event-ID"],
+)
 
 
 @app.get("/healthz")
@@ -167,3 +191,60 @@ def run_events(
     start = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
     return StreamingResponse(sse_stream(run_id, start), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _encode_cursor(run: Run) -> str:
+    return base64.urlsafe_b64encode(f"{run.created_at.isoformat()}|{run.id}".encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    try:
+        ts, rid = base64.urlsafe_b64decode(cursor.encode()).decode().split("|")
+        return datetime.fromisoformat(ts), uuid.UUID(rid)
+    except (ValueError, UnicodeDecodeError) as e:
+        raise HTTPException(422, "invalid cursor") from e
+
+
+@app.get("/v1/runs", response_model=RunList)
+def list_runs(
+    status: str | None = None,
+    language: str | None = None,
+    limit: int = 20,
+    cursor: str | None = None,
+    key_id: uuid.UUID = Depends(require_key),
+) -> RunList:
+    """Newest first, filtered, with keyset (cursor) pagination: stable while runs are inserted."""
+    if not 1 <= limit <= 100:
+        raise HTTPException(422, "limit must be 1..100")
+    if status is not None and status not in states.ALL:
+        raise HTTPException(422, "unknown status")
+    q = select(Run).where(Run.api_key_id == key_id)
+    if status:
+        q = q.where(Run.status == status)
+    if language:
+        q = q.where(Run.language == language)
+    if cursor:
+        ts, rid = _decode_cursor(cursor)
+        q = q.where((Run.created_at < ts) | ((Run.created_at == ts) & (Run.id < rid)))
+    with Session(get_engine(), expire_on_commit=False) as s:
+        rows = list(s.scalars(q.order_by(Run.created_at.desc(), Run.id.desc()).limit(limit + 1)))
+    page = rows[:limit]
+    return RunList(runs=[RunSummary.model_validate(r) for r in page],
+                   next_cursor=_encode_cursor(page[-1]) if len(rows) > limit else None)
+
+
+@app.get("/v1/cluster", response_model=ClusterOut)
+def cluster(key_id: uuid.UUID = Depends(require_key)) -> ClusterOut:
+    """Queue and slot numbers come from the database (live); the node view is the dispatcher's
+    latest snapshot, because only the dispatcher can see the cluster."""
+    cap = int(os.environ.get("CONCURRENCY_CAP", "4"))
+    with Session(get_engine()) as s:
+        counts = dict(s.execute(select(Run.status, func.count()).where(
+            Run.status.in_([states.QUEUED, states.DISPATCHING, states.RUNNING])).group_by(Run.status)).all())
+        snap = s.get(ClusterState, 1)
+        age = (datetime.now(UTC) - snap.updated_at).total_seconds() if snap else None
+        nodes = [NodeInfo(**n) for n in (snap.data.get("nodes", []) if snap else [])]
+    active = counts.get(states.DISPATCHING, 0) + counts.get(states.RUNNING, 0)
+    return ClusterOut(concurrency_cap=cap, queued=counts.get(states.QUEUED, 0),
+                      dispatching=counts.get(states.DISPATCHING, 0), running=counts.get(states.RUNNING, 0),
+                      free_slots=max(cap - active, 0), nodes=nodes, snapshot_age_seconds=age)

@@ -14,7 +14,9 @@ up:
 	kind load docker-image $(IMAGE_API) $(IMAGE_RUNNER_PY) $(IMAGE_RUNNER_NODE) --name $(CLUSTER)
 	helm upgrade --install ksc charts/ksc -n ksc-system --create-namespace \
 	  -f charts/ksc/values-kind.yaml --set image.api=$(IMAGE_API) \
-	  --set image.runnerPython=$(IMAGE_RUNNER_PY) --set image.runnerNode=$(IMAGE_RUNNER_NODE) --wait --timeout 5m
+	  --set image.runnerPython=$(IMAGE_RUNNER_PY) --set image.runnerNode=$(IMAGE_RUNNER_NODE) \
+	  --set-json knownNodes="$$(kubectl get nodes -l '!node-role.kubernetes.io/control-plane' -o json | jq -c '[.items[].metadata.name]')" \
+	  --wait --timeout 5m
 	kubectl -n ksc-system rollout restart deploy/ksc-api deploy/ksc-dispatcher >/dev/null
 	kubectl -n ksc-system rollout status deploy/ksc-api deploy/ksc-dispatcher --timeout=120s
 	@echo "cluster up: $(WORKERS) workers. API: kubectl -n ksc-system port-forward svc/ksc-api 8080:8080"
