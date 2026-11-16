@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 MAX_CODE_BYTES = 64 * 1024
 LANGUAGES = ("python3.12", "node20")
-SUPPORTED = tuple(os.environ.get("KSC_LANGUAGES", "python3.12").split(","))
+SUPPORTED = tuple(os.environ.get("KSC_LANGUAGES", "python3.12,node20").split(","))
 
 
 class RunCreate(BaseModel):
@@ -33,3 +33,11 @@ class RunOut(BaseModel):
     finished_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class BatchCreate(BaseModel):
+    runs: list[RunCreate] = Field(min_length=1, max_length=20)
+
+
+class BatchOut(BaseModel):
+    runs: list[RunOut]

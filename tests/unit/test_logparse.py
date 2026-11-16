@@ -31,3 +31,12 @@ def test_per_stream_cap_enforced_even_if_wrapper_misbehaves():
 
 def test_non_utf8_does_not_crash():
     assert parse(line("out", b"\xff\xfe")).stdout
+
+
+def test_complete_lines_drops_partial_tail_and_chunks_are_numbered():
+    from dispatcher.logparse import complete_lines, iter_chunks
+    raw = line("out", b"a") + "\n" + line("meta", truncated=True) + "\n" + line("err", b"b") + "\n" + '{"s":"o'
+    lines = complete_lines(raw)
+    assert len(lines) == 3
+    assert list(iter_chunks(lines)) == [(0, "stdout", "a"), (2, "stderr", "b")]
+    assert list(iter_chunks(lines, start=1)) == [(2, "stderr", "b")]

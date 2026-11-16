@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -89,7 +90,7 @@ def _transition(engine: Engine, run_id: str, new: str, **fields: object) -> bool
 def dispatch(engine: Engine, kube: Kube, c: Claimed, sandbox: podspec.SandboxSettings) -> None:
     job = podspec.build_job(c.id, c.language, c.timeout_seconds, sandbox)
     try:
-        kube.ensure_run(c.id, job, c.code, c.stdin)
+        kube.ensure_run(c.id, job, c.code, c.stdin, c.language)
     except Exception as e:  # noqa: BLE001 - any failure to create must not strand the run
         metrics.k8s_api_errors["ensure_run"] += 1
         log.warning("dispatch failed, re-queueing", extra={"run_id": c.id, "error": str(e)})
@@ -120,6 +121,31 @@ def classify(pod: PodInfo, parsed: logparse.ParsedLogs) -> tuple[str, str | None
     return "failed", "nonzero_exit"
 
 
+_streamed: dict[str, int] = {}  # run id -> framed log lines already persisted (an optimisation only)
+
+
+def persist_chunks(engine: Engine, run_id: str, raw: str) -> None:
+    """Store output chunks as events. The unique (run, line) index makes this idempotent, so it is
+    safe with several replicas, after a restart, and when finalize re-reads the whole log."""
+    lines = logparse.complete_lines(raw)
+    start = _streamed.get(run_id, 0)
+    rows = [{"run_id": uuid.UUID(run_id), "kind": kind, "data": {"text": text, "line": n}}
+            for n, kind, text in logparse.iter_chunks(lines, start)]
+    if rows:
+        with Session(engine) as s, s.begin():
+            s.execute(pg_insert(RunEvent).values(rows).on_conflict_do_nothing())
+    _streamed[run_id] = len(lines)
+
+
+def stream_logs(engine: Engine, kube: Kube, run_id: str, pod: PodInfo) -> None:
+    try:
+        raw = kube.read_logs(pod.name, MAX_LOG_READ)
+    except Exception:  # noqa: BLE001 - a missed poll is harmless; the next one catches up
+        metrics.k8s_api_errors["read_logs"] += 1
+        return
+    persist_chunks(engine, run_id, raw)
+
+
 def finalize(engine: Engine, kube: Kube, run_id: str, pod: PodInfo) -> None:
     raw = ""
     try:
@@ -129,16 +155,14 @@ def finalize(engine: Engine, kube: Kube, run_id: str, pod: PodInfo) -> None:
         log.warning("log read failed", extra={"run_id": run_id, "error": str(e)})
     parsed = logparse.parse(raw, MAX_STREAM)
     status, reason = classify(pod, parsed)
+    persist_chunks(engine, run_id, raw)  # logs first, then the terminal state event
+    _streamed.pop(run_id, None)
     ok = _transition(
         engine, run_id, status, exit_code=pod.exit_code, termination_reason=reason,
         stdout=parsed.stdout, stderr=parsed.stderr, truncated=parsed.truncated,
         node=pod.node, started_at=pod.started_at, finished_at=_now(),
     )
     if ok:
-        with Session(engine) as s, s.begin():
-            for kind, data in (("stdout", parsed.stdout), ("stderr", parsed.stderr)):
-                if data:
-                    s.add(RunEvent(run_id=uuid.UUID(run_id), kind=kind, data={"text": data}))
         log.info("run finished", extra={"run_id": run_id, "status": status})
     # Result is persisted first; only then are the cluster objects removed.
     kube.delete_run(run_id)
@@ -156,6 +180,8 @@ def observe(engine: Engine, kube: Kube, timing: Timing, now: datetime | None = N
     with Session(engine) as s:
         live = {str(r.id): (r.status, r.dispatched_at) for r in s.scalars(
             select(Run).where(Run.status.in_([states.DISPATCHING, states.RUNNING])))}
+    for stale in [k for k in _streamed if k not in live]:  # cancelled or gone: forget progress
+        del _streamed[stale]
     if not live:
         return
     pods = kube.list_pods()
@@ -175,6 +201,7 @@ def observe(engine: Engine, kube: Kube, timing: Timing, now: datetime | None = N
         elif pod.phase == "Running":
             if status == states.DISPATCHING:
                 _transition(engine, run_id, states.RUNNING, node=pod.node, started_at=pod.started_at)
+            stream_logs(engine, kube, run_id, pod)
         elif pod.phase == "Pending":
             if pod.waiting_reason in IMAGE_ERRORS and age > timing.image_error_after:
                 fail_run(engine, kube, run_id, "infra_error", "image_error")

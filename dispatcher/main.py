@@ -27,7 +27,10 @@ def main() -> None:
     cap = int(os.environ.get("CONCURRENCY_CAP", "4"))
     sandbox = podspec.SandboxSettings(
         namespace=ns,
-        images={"python3.12": os.environ.get("RUNNER_IMAGE_PYTHON", "ksc/runner-python:dev")},
+        images={
+            "python3.12": os.environ.get("RUNNER_IMAGE_PYTHON", "ksc/runner-python:dev"),
+            "node20": os.environ.get("RUNNER_IMAGE_NODE", "ksc/runner-node:dev"),
+        },
     )
     timing = core.Timing(
         sweep_max_age=float(os.environ.get("SWEEP_MAX_AGE_SECONDS", "600")),
@@ -53,7 +56,7 @@ def main() -> None:
                 core.sweep(engine, kube, timing)
         except Exception:
             logging.getLogger("ksc.dispatcher").exception("tick failed")
-        time.sleep(1)
+        time.sleep(float(os.environ.get("TICK_SECONDS", "0.5")))
 
 
 if __name__ == "__main__":

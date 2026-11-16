@@ -1,0 +1,6 @@
+FROM node:20-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
+RUN groupmod -g 10001 node && usermod -u 10001 -g 10001 node
+COPY runner/ksc_run.js /opt/ksc/ksc_run.js
+ENV HOME=/tmp NODE_ENV=production KSC_COMMAND='["node","/code/main.js"]'
+USER 10001:10001
+ENTRYPOINT ["node", "/opt/ksc/ksc_run.js"]

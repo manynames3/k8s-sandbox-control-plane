@@ -3,16 +3,18 @@ WORKERS ?= 2
 CLUSTER ?= ksc
 IMAGE_API ?= ksc/api:dev
 IMAGE_RUNNER_PY ?= ksc/runner-python:dev
+IMAGE_RUNNER_NODE ?= ksc/runner-node:dev
 
 up:
 	@[ -n "$$CI" ] || bash scripts/doctor.sh >/dev/null || { echo "make doctor failed"; exit 1; }
 	WORKERS=$(WORKERS) CLUSTER_NAME=$(CLUSTER) deploy/kind/up.sh
 	docker build -q -f Dockerfile.api -t $(IMAGE_API) .
 	docker build -q -f runner/Dockerfile.python -t $(IMAGE_RUNNER_PY) .
-	kind load docker-image $(IMAGE_API) $(IMAGE_RUNNER_PY) --name $(CLUSTER)
+	docker build -q -f runner/Dockerfile.node -t $(IMAGE_RUNNER_NODE) .
+	kind load docker-image $(IMAGE_API) $(IMAGE_RUNNER_PY) $(IMAGE_RUNNER_NODE) --name $(CLUSTER)
 	helm upgrade --install ksc charts/ksc -n ksc-system --create-namespace \
 	  -f charts/ksc/values-kind.yaml --set image.api=$(IMAGE_API) \
-	  --set image.runnerPython=$(IMAGE_RUNNER_PY) --wait --timeout 5m
+	  --set image.runnerPython=$(IMAGE_RUNNER_PY) --set image.runnerNode=$(IMAGE_RUNNER_NODE) --wait --timeout 5m
 	kubectl -n ksc-system rollout restart deploy/ksc-api deploy/ksc-dispatcher >/dev/null
 	kubectl -n ksc-system rollout status deploy/ksc-api deploy/ksc-dispatcher --timeout=120s
 	@echo "cluster up: $(WORKERS) workers. API: kubectl -n ksc-system port-forward svc/ksc-api 8080:8080"

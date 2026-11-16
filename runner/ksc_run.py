@@ -37,7 +37,7 @@ def emit(obj: dict) -> None:
 def pump(stream, tag: str, state: dict) -> None:
     sent = 0
     while True:
-        data = stream.read(CHUNK)
+        data = stream.read1(CHUNK)  # read() would block until CHUNK bytes or EOF: no live output
         if not data:
             return
         room = MAX_STREAM_BYTES - sent

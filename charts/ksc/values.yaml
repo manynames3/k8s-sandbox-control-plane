@@ -7,6 +7,7 @@ concurrencyCap: 4
 image:
   api: ksc/api:dev
   runnerPython: ksc/runner-python:dev
+  runnerNode: ksc/runner-node:dev
   pullPolicy: IfNotPresent
 
 dispatcher:

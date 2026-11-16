@@ -79,3 +79,13 @@ def test_user_code_only_enters_via_configmap_owned_by_job():
     job, _, c = spec()
     assert "print" not in str(job)  # code is not embedded in the Job
     assert [e["name"] for e in c["env"]] == ["KSC_TIMEOUT_SECONDS"]
+
+
+def test_node_code_goes_in_main_js_with_the_same_hardening():
+    from dispatcher.podspec import SandboxSettings, build_job
+    cm = build_configmap(RID, "console.log(1)", None, "sandboxes", "uid", "node20")
+    assert list(cm["data"]) == ["main.js"]
+    job = build_job(RID, "node20", 30, SandboxSettings())
+    c = job["spec"]["template"]["spec"]["containers"][0]
+    assert c["image"].startswith("ksc/runner-node")
+    assert c["securityContext"]["readOnlyRootFilesystem"] is True

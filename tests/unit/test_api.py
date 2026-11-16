@@ -50,7 +50,7 @@ def test_idempotency(client, key):
 
 @pytest.mark.parametrize("patch", [
     {"code": ""}, {"timeout_seconds": 0}, {"timeout_seconds": 121},
-    {"code": "x" * (64 * 1024 + 1)}, {"language": "node20"}, {"language": "ruby"},
+    {"code": "x" * (64 * 1024 + 1)}, {"language": "ruby"},
 ])
 def test_validation(client, key, patch):
     assert client.post("/v1/runs", json={**BODY, **patch}, headers=key).status_code == 422
@@ -60,3 +60,60 @@ def test_runs_are_private_to_their_key(client, key, db):
     rid = client.post("/v1/runs", json=BODY, headers=key).json()["id"]
     other = {"Authorization": "Bearer " + create("other")}
     assert client.get(f"/v1/runs/{rid}", headers=other).status_code == 404
+
+
+def test_batch_creates_all_and_is_idempotent(client, key):
+    body = {"runs": [{"language": "python3.12", "code": f"print({i})"} for i in range(3)]}
+    h = {**key, "Idempotency-Key": "b1"}
+    a = client.post("/v1/runs:batch", json=body, headers=h)
+    assert a.status_code == 202 and len(a.json()["runs"]) == 3
+    b = client.post("/v1/runs:batch", json=body, headers=h)
+    assert [r["id"] for r in a.json()["runs"]] == [r["id"] for r in b.json()["runs"]]
+
+
+@pytest.mark.parametrize("n", [0, 21])
+def test_batch_size_limits(client, key, n):
+    body = {"runs": [{"language": "python3.12", "code": "pass"}] * n}
+    assert client.post("/v1/runs:batch", json=body, headers=key).status_code == 422
+
+
+def test_batch_is_atomic_on_a_bad_member(client, key, db):
+    from sqlalchemy import text
+    body = {"runs": [{"language": "python3.12", "code": "pass"},
+                     {"language": "python3.12", "code": "x" * (64 * 1024 + 1)}]}
+    assert client.post("/v1/runs:batch", json=body, headers=key).status_code == 422
+    with db.connect() as c:
+        assert c.execute(text("select count(*) from runs")).scalar() == 0
+
+
+def test_node_is_enabled(client, key):
+    r = client.post("/v1/runs", json={"language": "node20", "code": "console.log(1)"}, headers=key)
+    assert r.status_code == 202
+
+
+def test_sse_streams_state_and_log_events_then_ends(client, key, db):
+    from sqlalchemy import text
+    rid = client.post("/v1/runs", json=BODY, headers=key).json()["id"]
+    with db.begin() as c:
+        c.execute(text("insert into run_events (run_id, kind, data) values (:r, 'stdout', "
+                       "'{\"text\": \"hello\\\\n\", \"line\": 0}')"), {"r": rid})
+        c.execute(text("update runs set status='succeeded' where id=:r"), {"r": rid})
+        c.execute(text("insert into run_events (run_id, kind, data) values (:r, 'state', "
+                       "'{\"status\": \"succeeded\"}')"), {"r": rid})
+    r = client.get(f"/v1/runs/{rid}/events", headers=key)
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/event-stream")
+    kinds = [ln.split(": ", 1)[1] for ln in r.text.splitlines() if ln.startswith("event: ")]
+    assert kinds == ["state", "stdout", "state", "end"]  # queued, log, succeeded, end
+
+
+def test_sse_resumes_after_last_event_id_and_is_private(client, key, db):
+    rid = client.post("/v1/runs", json=BODY, headers=key).json()["id"]
+    from sqlalchemy import text
+    with db.begin() as c:
+        c.execute(text("update runs set status='failed' where id=:r"), {"r": rid})
+    first = client.get(f"/v1/runs/{rid}/events", headers=key).text
+    last_id = [ln for ln in first.splitlines() if ln.startswith("id: ")][-1].split(": ")[1]
+    again = client.get(f"/v1/runs/{rid}/events", headers={**key, "Last-Event-ID": last_id}).text
+    assert "event: state" not in again and "event: end" in again
+    other = {"Authorization": "Bearer " + create("o2")}
+    assert client.get(f"/v1/runs/{rid}/events", headers=other).status_code == 404

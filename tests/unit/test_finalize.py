@@ -113,3 +113,16 @@ def test_eviction_is_user_fault_only_for_storage(db, message, expected, reason):
     core.finalize(db, FakeKube(""), rid, p)
     run = get(db, rid)
     assert (run.status, run.termination_reason) == (expected, reason)
+
+
+def test_chunks_are_idempotent_and_streamed_before_final_state(db):
+    rid = make_run(db)
+    part = frame("out", b"one\n") + "\n"
+    core._streamed.clear()
+    core.persist_chunks(db, rid, part)
+    core._streamed.clear()  # a second replica / a restart re-reads from line 0
+    core.persist_chunks(db, rid, part + frame("out", b"two\n") + "\n")
+    with Session(db) as s:
+        texts = [e.data["text"] for e in s.query(RunEvent).filter_by(run_id=uuid.UUID(rid), kind="stdout")
+                 .order_by(RunEvent.id)]
+    assert texts == ["one\n", "two\n"]  # no duplicates

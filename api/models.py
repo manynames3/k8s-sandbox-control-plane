@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -66,3 +67,9 @@ class RunEvent(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     kind: Mapped[str] = mapped_column(String(20))  # state | stdout | stderr
     data: Mapped[dict] = mapped_column(JSONB, default=dict)  # type: ignore[type-arg]
+    # Log chunks carry their line number in the framed runner log, so streaming from several
+    # dispatcher replicas (or after a restart) cannot create duplicates.
+    __table_args__ = (
+        Index("uq_run_events_line", "run_id", text("(data->>'line')"), unique=True,
+              postgresql_where=text("kind IN ('stdout','stderr')")),
+    )

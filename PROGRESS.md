@@ -70,3 +70,19 @@
 **Caveats:** the orphan e2e test temporarily sets sweeper env on the live dispatcher (restores afterwards; must not run concurrently with other e2e tests). Layer-2 (`activeDeadlineSeconds`) is only unit-tested via fakes, since the wrapper always fires first. Per-key rate limit and concurrency cap are still not enforced. Cancelling a queued run is unit-tested only.
 
 **Next:** phase 4: admission policy (ValidatingAdmissionPolicy), attack suite, chaos tests, `ci.yml`, GitHub repo (public) and a real CI run.
+
+## Phase 4 — Admission policy, attack suite, chaos, CI (2026-11-16, ~2 h) — **Tier 1 complete**
+
+**Done:** `ValidatingAdmissionPolicy` + binding on `sandboxes` (read-only rootfs, no token, cpu/memory/ephemeral-storage limits, only configMap/emptyDir volumes); attack suite (15 tests, `make attack`); chaos suite (2 tests, `make chaos`); `.github/workflows/ci.yml`; Postgres in the chart hardened (non-root, read-only rootfs, no capabilities) after trivy flagged it; public repo https://github.com/manynames3/k8s-sandbox-control-plane.
+
+**Verified how (real CI run, ubuntu-24.04, 2026-11-16, ~8 min, run 43830478003):** lint-and-unit (60 unit), static-checks (gitleaks full history, kubeconform, cost traps, 5 MB file check, trivy config), cluster-tests (kind + Calico, trivy image scan CRITICAL, verify-cluster, 10 e2e, 15 attack, 2 chaos). All green. Same suites also pass locally.
+
+**Found on the way:** kubelet eviction message for the emptyDir limit is `Usage of EmptyDir volume "tmp" exceeds the limit "64Mi"` (classifier only matched "ephemeral"); `KUBERNETES_*` service address env vars are always injected (an address, not a credential; network denial is tested separately); errno values in tests must be Linux's, not the Mac's; `gitleaks-action` failed on the runner ("stderr is not empty"), replaced by the pinned binary; `verify-cluster`'s own probe pod was (correctly) refused by the new admission policy and was made compliant.
+
+**Not covered / honest limits:** tflint and Checkov are wired only when `infra/` exists (phase 8). Per-key rate limit and concurrency cap are still not enforced. kind runs runc: shared kernel (gVisor is the stretch goal in the AWS session).
+
+## Phase 5a/5b — Node runtime, batch, log streaming, SSE (2026-11-16, in progress)
+
+**Done:** `node:20-slim` runner (digest-pinned, same wrapper protocol in `runner/ksc_run.js`); per-language code file in the ConfigMap; `POST /v1/runs:batch` (1-20, atomic, idempotent per item); dispatcher persists output chunks as events while the run is `running` (unique `(run_id, line)` index makes this replica- and restart-safe); `GET /v1/runs/{id}/events` SSE with `Last-Event-ID` resume; loop interval 0.5 s.
+**Found:** the Python wrapper used `read(4096)` on a buffered pipe, so output reached the log only at exit; fixed with `read1`. The SSE e2e test (logs arrive >4 s before an 8 s run ends) caught it.
+**Verified:** 69 unit, e2e incl. Node hello/exit/stdin/timeout/OOM, batch of 20 (cap never exceeded at any sample, both languages, ordered output), SSE (3/3 runs).

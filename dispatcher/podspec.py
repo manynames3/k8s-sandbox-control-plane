@@ -7,12 +7,14 @@ SANDBOX_UID = 10001
 MANAGED_BY = "app.kubernetes.io/managed-by"
 RUN_ID_LABEL = "ksc.dev/run-id"
 DEADLINE_GRACE = 30
+CODE_FILES = {"python3.12": "main.py", "node20": "main.js"}  # key inside the ConfigMap, per language
 
 
 @dataclass(frozen=True)
 class SandboxSettings:
     namespace: str = "sandboxes"
-    images: dict[str, str] = field(default_factory=lambda: {"python3.12": "ksc/runner-python:dev"})
+    images: dict[str, str] = field(default_factory=lambda: {
+        "python3.12": "ksc/runner-python:dev", "node20": "ksc/runner-node:dev"})
     cpu: str = "500m"
     memory: str = "512Mi"
     ephemeral_storage: str = "128Mi"
@@ -100,8 +102,8 @@ def build_job(run_id: str, language: str, timeout_seconds: int, s: SandboxSettin
 
 
 def build_configmap(run_id: str, code: str, stdin: str | None, namespace: str,
-                    job_uid: str) -> dict[str, Any]:
-    data = {"main.py": code}
+                    job_uid: str, language: str = "python3.12") -> dict[str, Any]:
+    data = {CODE_FILES[language]: code}
     if stdin is not None:
         data["stdin"] = stdin
     return {

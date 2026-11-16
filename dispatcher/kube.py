@@ -37,7 +37,8 @@ class Obj:
 
 
 class Kube(Protocol):
-    def ensure_run(self, run_id: str, job: dict[str, Any], code: str, stdin: str | None) -> None: ...
+    def ensure_run(self, run_id: str, job: dict[str, Any], code: str, stdin: str | None,
+                   language: str) -> None: ...
     def list_pods(self) -> dict[str, PodInfo]: ...
     def list_objects(self) -> list[Obj]: ...
     def read_logs(self, pod_name: str, limit_bytes: int) -> str: ...
@@ -64,7 +65,8 @@ class RealKube:
         self.core = client.CoreV1Api()
         self.selector = f"{podspec.MANAGED_BY}=ksc"
 
-    def ensure_run(self, run_id: str, job: dict[str, Any], code: str, stdin: str | None) -> None:
+    def ensure_run(self, run_id: str, job: dict[str, Any], code: str, stdin: str | None,
+                   language: str) -> None:
         try:
             created = self.batch.create_namespaced_job(self.ns, job)
             uid = created.metadata.uid
@@ -72,7 +74,7 @@ class RealKube:
             if e.status != 409:
                 raise
             uid = self.batch.read_namespaced_job(podspec.job_name(run_id), self.ns).metadata.uid
-        cm = podspec.build_configmap(run_id, code, stdin, self.ns, uid)
+        cm = podspec.build_configmap(run_id, code, stdin, self.ns, uid, language)
         try:
             self.core.create_namespaced_config_map(self.ns, cm)
         except ApiException as e:
