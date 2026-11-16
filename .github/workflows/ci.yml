@@ -74,11 +74,31 @@ jobs:
       - name: No files over 5 MB
         run: scripts/check-file-sizes.sh
       - name: trivy misconfiguration scan (chart, Dockerfiles)
-        run: trivy config --exit-code 1 --severity HIGH,CRITICAL --skip-files deploy/kind/calico-v3.33.1.yaml .
-      - name: tflint / checkov (only once infra/ exists, phase 8)
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL --ignorefile .trivyignore.yaml --skip-files deploy/kind/calico-v3.33.1.yaml --skip-dirs "**/.terraform" .
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.9
+          terraform_wrapper: false
+      - name: terraform fmt and validate (both stacks)
         run: |
-          if [ -d infra ]; then echo "infra present: wire tflint and checkov here"; exit 1; fi
-          echo "no terraform yet"
+          terraform fmt -check -recursive infra
+          for d in infra/bootstrap infra/eks; do
+            terraform -chdir=$d init -backend=false -input=false >/dev/null
+            terraform -chdir=$d validate
+          done
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.63.1
+      - name: tflint (aws ruleset)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tflint --init
+          for d in infra/bootstrap infra/eks; do tflint --chdir=$d --config="$GITHUB_WORKSPACE/.tflint.hcl"; done
+      - name: Checkov (skips are justified inline in the Terraform)
+        run: |
+          pip install --quiet "checkov==3.4.5"
+          checkov -d infra --framework terraform --compact --quiet
 
   cluster-tests:
     runs-on: ubuntu-24.04

@@ -33,6 +33,11 @@ spec:
             - {name: CONCURRENCY_CAP, value: {{ .Values.concurrencyCap | quote }}}
             - {name: RUNNER_IMAGE_PYTHON, value: {{ .Values.image.runnerPython | quote }}}
             - {name: KNOWN_NODES, value: {{ join "," .Values.knownNodes | quote }}}
+            - {name: SANDBOX_NODE_SELECTOR, value: {{ .Values.sandbox.nodeSelector | toJson | quote }}}
+            - {name: SANDBOX_TOLERATIONS, value: {{ .Values.sandbox.tolerations | toJson | quote }}}
+            - {name: SANDBOX_RUNTIME_CLASS, value: {{ .Values.sandbox.runtimeClassName | quote }}}
+            - {name: DB_CONNECT_TIMEOUT, value: {{ .Values.db.connectTimeoutSeconds | quote }}}
+            - {name: LOG_RETENTION_DAYS, value: {{ .Values.logRetentionDays | quote }}}
             - {name: RUNNER_IMAGE_NODE, value: {{ .Values.image.runnerNode | quote }}}
           securityContext:
             allowPrivilegeEscalation: false

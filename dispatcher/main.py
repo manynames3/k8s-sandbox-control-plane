@@ -29,6 +29,9 @@ def main() -> None:
     cap = int(os.environ.get("CONCURRENCY_CAP", "4"))
     sandbox = podspec.SandboxSettings(
         namespace=ns,
+        node_selector=json.loads(os.environ.get("SANDBOX_NODE_SELECTOR", "{}")),
+        tolerations=json.loads(os.environ.get("SANDBOX_TOLERATIONS", "[]")),
+        runtime_class=os.environ.get("SANDBOX_RUNTIME_CLASS", ""),
         images={
             "python3.12": os.environ.get("RUNNER_IMAGE_PYTHON", "ksc/runner-python:dev"),
             "node20": os.environ.get("RUNNER_IMAGE_NODE", "ksc/runner-node:dev"),
@@ -42,6 +45,8 @@ def main() -> None:
     engine, kube = get_engine(), RealKube(ns)
     known_nodes = [n for n in os.environ.get("KNOWN_NODES", "").split(",") if n]
     last_sweep = datetime.min.replace(tzinfo=UTC)
+    last_prune = datetime.min.replace(tzinfo=UTC)
+    retention_days = float(os.environ.get("LOG_RETENTION_DAYS", "7"))
     stop = False
 
     def _stop(*_: object) -> None:
@@ -59,6 +64,9 @@ def main() -> None:
             if (datetime.now(UTC) - last_sweep).total_seconds() >= timing.sweep_interval:
                 last_sweep = datetime.now(UTC)
                 core.sweep(engine, kube, timing)
+            if (datetime.now(UTC) - last_prune).total_seconds() >= 3600:
+                last_prune = datetime.now(UTC)
+                core.prune_old_logs(engine, retention_days)
         except Exception:
             logging.getLogger("ksc.dispatcher").exception("tick failed")
         time.sleep(float(os.environ.get("TICK_SECONDS", "0.5")))

@@ -54,9 +54,10 @@ def secs(a, b):
 # --- network -----------------------------------------------------------------------------------
 
 def test_network_is_fully_denied_but_run_completes(client):
-    pg_ip = kubectl("-n", NS_SYS, "get", "pod", "-l", "app=ksc-postgres", "-o",
-                    "jsonpath={.items[0].status.podIP}")
-    assert pg_ip
+    # another pod in the trusted namespace (the API) and the Kubernetes API service, wherever they live
+    pod_ip = kubectl("-n", NS_SYS, "get", "pod", "-l", "app=ksc-api", "-o", "jsonpath={.items[0].status.podIP}")
+    k8s_ip = kubectl("-n", "default", "get", "svc", "kubernetes", "-o", "jsonpath={.spec.clusterIP}")
+    assert pod_ip and k8s_ip
     result = run(client, f"""
         import socket
         def tcp(host, port):
@@ -68,8 +69,8 @@ def test_network_is_fully_denied_but_run_completes(client):
             finally:
                 s.close()
         print("public", tcp("1.1.1.1", 443))
-        print("k8s-api", tcp("10.96.0.1", 443))
-        print("other-pod", tcp("{pg_ip}", 5432))
+        print("k8s-api", tcp("{k8s_ip}", 443))
+        print("other-pod", tcp("{pod_ip}", 8080))
         print("metadata", tcp("169.254.169.254", 80))
         try:
             socket.getaddrinfo("kubernetes.default.svc.cluster.local", 443); print("dns OPEN")

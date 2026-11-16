@@ -1,0 +1,31 @@
+# EKS session values. Images come from GHCR (the session workflow overrides the tags with the commit sha).
+# Database: Neon, through the pooled (PgBouncer, transaction mode) endpoint; the code needs nothing
+# session-scoped (ADR 2). The secret `ksc-neon` is created by the workflow from GitHub secrets and
+# holds DATABASE_URL (pooled, postgresql+psycopg://) and KEDA_CONNECTION (direct, postgresql://).
+concurrencyCap: 5            # 2 x t3.medium: 500m CPU per sandbox leaves room for kube-system
+
+image:
+  api: ghcr.io/manynames3/ksc-api:main
+  runnerPython: ghcr.io/manynames3/ksc-runner-python:main
+  runnerNode: ghcr.io/manynames3/ksc-runner-node:main
+  pullPolicy: IfNotPresent
+
+db:
+  connectTimeoutSeconds: 10
+
+postgres:
+  enabled: false
+  externalUrlSecret: ksc-neon
+
+keda:
+  enabled: true
+
+sandbox:
+  nodeSelector:
+    ksc.dev/pool: sandbox
+  tolerations:
+    - {key: ksc.dev/sandbox, operator: Equal, value: "true", effect: NoSchedule}
+
+# On EKS the API server is reached through the private endpoint of the VPC.
+apiServerCidr: 10.20.0.0/16
+apiServerPorts: [443]

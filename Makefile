@@ -1,4 +1,4 @@
-.PHONY: doctor disk clean nuke up down test e2e attack chaos lint verify-cluster monitoring bench snapshot
+.PHONY: doctor disk clean nuke up down test e2e attack chaos lint verify-cluster monitoring bench snapshot aws-plan
 WORKERS ?= 2
 CLUSTER ?= ksc
 IMAGE_API ?= ksc/api:dev
@@ -52,6 +52,15 @@ attack:
 
 chaos:
 	uv run pytest -v -m chaos tests/chaos
+
+# Read-only: shows what the EKS stack WOULD create. Needs your AWS credentials and the bootstrap applied
+# (docs/AWS.md). It never creates anything; applying is the eks-session workflow's job, started by you.
+aws-plan:
+	@[ -n "$$TF_STATE_BUCKET" ] || { echo "set TF_STATE_BUCKET to the bootstrap output state_bucket"; exit 1; }
+	terraform -chdir=infra/eks init -input=false \
+	  -backend-config="bucket=$$TF_STATE_BUCKET" -backend-config="key=eks/terraform.tfstate" \
+	  -backend-config="region=us-east-1" -backend-config="use_lockfile=true"
+	terraform -chdir=infra/eks plan -input=false -var="expires_at=$$(date -u -v+2H +%Y-%m-%dT%H:%M:%SZ)"
 
 snapshot:
 	uv run python scripts/record_showcase.py

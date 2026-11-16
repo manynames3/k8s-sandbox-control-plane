@@ -1,0 +1,7 @@
+{
+  "kubernetes_version": "1.36",
+  "end_of_standard_support": "2027-08-02",
+  "checked_on": "2026-11-16",
+  "source": "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html",
+  "note": "From the AWS release calendar as read on checked_on; the calendar and the API can differ by a day. The session workflow re-verifies against `aws eks describe-cluster-versions` before creating anything. Update this file and kubernetes_version in variables.tf together."
+}

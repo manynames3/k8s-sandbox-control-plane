@@ -21,6 +21,7 @@ class SandboxSettings:
     tmp_size_limit: str = "64Mi"
     node_selector: dict[str, str] = field(default_factory=dict)
     tolerations: list[dict[str, Any]] = field(default_factory=list)
+    runtime_class: str = ""  # e.g. gvisor; empty means the node's default runtime (runc)
 
 
 def job_name(run_id: str) -> str:
@@ -88,6 +89,8 @@ def build_job(run_id: str, language: str, timeout_seconds: int, s: SandboxSettin
         pod_spec["nodeSelector"] = dict(s.node_selector)
     if s.tolerations:
         pod_spec["tolerations"] = list(s.tolerations)
+    if s.runtime_class:
+        pod_spec["runtimeClassName"] = s.runtime_class
     return {
         "apiVersion": "batch/v1",
         "kind": "Job",

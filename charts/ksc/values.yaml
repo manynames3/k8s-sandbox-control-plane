@@ -32,6 +32,13 @@ monitoring:
 # Worker node names, shown in the UI's cluster panel even while idle (make up fills this in).
 knownNodes: []
 
+# Output chunks of finished runs are deleted after this many days (keeps the database small).
+logRetentionDays: 7
+
+db:
+  # Fail fast on kind so /readyz reports an outage quickly; Neon needs longer to wake from suspension.
+  connectTimeoutSeconds: 3
+
 postgres:
   enabled: true            # in-cluster Postgres (local/CI). Off on EKS (Neon).
   image: postgres:16-alpine
@@ -45,8 +52,18 @@ sandbox:
   maxMemory: 512Mi
   maxCpu: 500m
   ephemeralStorage: 128Mi
+  # Where sandboxes may run (EKS: the tainted sandbox node group). Empty on kind.
+  nodeSelector: {}
+  tolerations: []
+  # RuntimeClass for sandbox pods (e.g. gvisor). Empty = the node default (runc).
+  runtimeClassName: ""
   # Optional egress allowlist (CIDRs). Empty = fully denied. 169.254.0.0/16 is always excluded.
   egressAllowCidrs: []
+
+# External database (Neon) egress for the trusted namespace, used when postgres.enabled is false.
+# Only these TCP ports, and never to private or link-local ranges.
+externalDb:
+  egressPorts: [5432]
 
 # Kubernetes API server egress for the trusted namespace (kind: control-plane container IP).
 apiServerCidr: 0.0.0.0/0

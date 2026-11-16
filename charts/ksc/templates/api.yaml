@@ -39,6 +39,7 @@ spec:
           envFrom: [{secretRef: {name: {{ $secret }}}}]
           env:
             - {name: CONCURRENCY_CAP, value: {{ .Values.concurrencyCap | quote }}}
+            - {name: DB_CONNECT_TIMEOUT, value: {{ .Values.db.connectTimeoutSeconds | quote }}}
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 10}
           securityContext: *sc

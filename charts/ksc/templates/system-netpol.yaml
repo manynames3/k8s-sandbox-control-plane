@@ -20,3 +20,25 @@ spec:
         {{- range .Values.apiServerPorts }}
         - {port: {{ . }}, protocol: TCP}
         {{- end }}
+{{- if not .Values.postgres.enabled }}
+---
+# The database is outside the cluster (Neon): allow its TCP port from the trusted namespace only.
+# Public addresses only; private ranges and the link-local metadata range stay blocked.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-db
+  namespace: {{ .Values.systemNamespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10"]
+      ports:
+        {{- range .Values.externalDb.egressPorts }}
+        - {port: {{ . }}, protocol: TCP}
+        {{- end }}
+{{- end }}

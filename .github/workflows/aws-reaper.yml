@@ -1,0 +1,72 @@
+name: aws-reaper
+# Independent backstop for the session workflow. A few times a day: if anything tagged project=ksc is past its
+# expires-at, destroy the stack and open an issue. NOTE: GitHub pauses scheduled workflows in repositories that
+# have been inactive for 60 days, so this is not the last line of defence: the AWS Budgets alerts ($5, $15, $25)
+# created by infra/bootstrap are. Read docs/AWS.md.
+on:
+  schedule:
+    - cron: "17 1,7,13,19 * * *"
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+concurrency:
+  group: eks-session   # never runs at the same time as a session
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  reap:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Is AWS configured? (the reaper does nothing before the owner has applied the bootstrap)
+        id: configured
+        run: |
+          if [ -n "${{ vars.AWS_ROLE_ARN }}" ] && [ -n "${{ vars.TF_STATE_BUCKET }}" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "AWS_ROLE_ARN / TF_STATE_BUCKET not set: nothing to reap"; fi
+      - uses: actions/checkout@v4
+        if: steps.configured.outputs.yes == 'true'
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.configured.outputs.yes == 'true'
+        with:
+          terraform_version: 1.14.9
+          terraform_wrapper: false
+      - name: Assume the AWS role (OIDC)
+        if: steps.configured.outputs.yes == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Anything past its expiry?
+        id: expired
+        if: steps.configured.outputs.yes == 'true'
+        run: bash scripts/aws_orphans.sh expired | tee expired.txt
+
+      - name: Destroy the stack
+        id: destroy
+        if: always() && steps.expired.outcome == 'failure'
+        working-directory: infra/eks
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=eks/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
+          terraform destroy -input=false -auto-approve -var="expires_at=reaped"
+
+      - name: Anything still left after the destroy?
+        id: after
+        if: always() && steps.expired.outcome == 'failure'
+        run: sleep 30; bash scripts/aws_orphans.sh list | tee after.txt
+
+      - name: Open an issue
+        if: always() && steps.expired.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          left="$( [ -f after.txt ] && cat after.txt || echo 'unknown' )"
+          gh issue create --title "aws-reaper found expired resources" --label bug \
+            --body "$(printf 'Resources tagged project=ksc were past their expires-at.\n\nExpired:\n```\n%s\n```\n\nDestroy outcome: %s\nStill present afterwards:\n```\n%s\n```\nRun: %s' "$(cat expired.txt)" "${{ steps.destroy.outcome }}" "$left" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")"

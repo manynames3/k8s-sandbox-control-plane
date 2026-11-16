@@ -27,7 +27,35 @@ def submit(client, code=SLOW, timeout=30):
 
 
 def psql(sql):
-    return kubectl("-n", NS_SYS, "exec", "ksc-postgres-0", "--", "psql", "-U", "ksc", "-At", "-c", sql)
+    """Run SQL through the API pod, so it works with the in-cluster Postgres and with Neon alike."""
+    code = ("import sys\nfrom sqlalchemy import text\nfrom api.db import get_engine\n"
+            "with get_engine().connect() as c:\n"
+            "    for row in c.execute(text(sys.argv[1])):\n"
+            "        print('|'.join(str(v) for v in row))")
+    return kubectl("-n", NS_SYS, "exec", "deploy/ksc-api", "--", "python", "-c", code, sql)
+
+
+def external_db():
+    return kubectl("-n", NS_SYS, "get", "statefulset", "ksc-postgres", "-o", "name", check=False) == ""
+
+
+def interrupt_database():
+    """In-cluster Postgres: scale it to zero. External (Neon): cut the trusted namespace's route to it
+    by removing the egress policy that allows it. Returns a function that restores service."""
+    if not external_db():
+        kubectl("-n", NS_SYS, "scale", "statefulset/ksc-postgres", "--replicas=0")
+        return lambda: kubectl("-n", NS_SYS, "scale", "statefulset/ksc-postgres", "--replicas=1")
+    saved = kubectl("-n", NS_SYS, "get", "networkpolicy", "allow-external-db", "-o", "json")
+    kubectl("-n", NS_SYS, "delete", "networkpolicy", "allow-external-db")
+
+    def restore():
+        import subprocess
+        meta = json.loads(saved)
+        for k in ("uid", "resourceVersion", "creationTimestamp", "generation", "managedFields"):
+            meta["metadata"].pop(k, None)
+        subprocess.run(["kubectl", "apply", "-f", "-"], input=json.dumps(meta), text=True, check=True,
+                       capture_output=True)
+    return restore
 
 
 def dispatcher_pod():
@@ -111,7 +139,7 @@ def test_database_interruption_degrades_readiness_and_recovers(client):
     api_restarts, disp_restarts = restart_count("ksc-api"), restart_count("ksc-dispatcher")
     assert readyz_status() == "200"
 
-    kubectl("-n", NS_SYS, "scale", "statefulset/ksc-postgres", "--replicas=0")
+    restore = interrupt_database()
     try:
         deadline = time.time() + 60
         while readyz_status() != "503":
@@ -119,7 +147,7 @@ def test_database_interruption_degrades_readiness_and_recovers(client):
             time.sleep(1)
         time.sleep(12)  # the run finishes in the cluster while the database is unreachable
     finally:
-        kubectl("-n", NS_SYS, "scale", "statefulset/ksc-postgres", "--replicas=1")
+        restore()
 
     deadline = time.time() + 120
     while readyz_status() != "200":

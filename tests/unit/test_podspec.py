@@ -89,3 +89,16 @@ def test_node_code_goes_in_main_js_with_the_same_hardening():
     c = job["spec"]["template"]["spec"]["containers"][0]
     assert c["image"].startswith("ksc/runner-node")
     assert c["securityContext"]["readOnlyRootFilesystem"] is True
+
+
+def test_runtime_class_and_placement_are_only_set_when_configured():
+    from dispatcher.podspec import SandboxSettings, build_job
+    plain = build_job(RID, "python3.12", 30, SandboxSettings())["spec"]["template"]["spec"]
+    assert "runtimeClassName" not in plain and "nodeSelector" not in plain and "tolerations" not in plain
+    s = SandboxSettings(runtime_class="gvisor", node_selector={"ksc.dev/pool": "sandbox"},
+                        tolerations=[{"key": "ksc.dev/sandbox", "operator": "Equal", "value": "true",
+                                      "effect": "NoSchedule"}])
+    pod = build_job(RID, "python3.12", 30, s)["spec"]["template"]["spec"]
+    assert pod["runtimeClassName"] == "gvisor" and pod["nodeSelector"] == {"ksc.dev/pool": "sandbox"}
+    assert pod["tolerations"][0]["key"] == "ksc.dev/sandbox"
+    assert pod["securityContext"]["runAsNonRoot"] is True  # placement never relaxes the hardening

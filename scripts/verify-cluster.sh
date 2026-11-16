@@ -3,10 +3,20 @@
 set -uo pipefail
 FAIL=0
 check() { if eval "$2" >/dev/null 2>&1; then echo "  ok    $1"; else echo "  FAIL  $1"; FAIL=1; fi; }
+# On EKS the sandbox pods must be placed on the tainted sandbox node group, like the dispatcher does.
+NODE_SELECTOR_YAML=""
+if [ "${KSC_ENV:-kind}" = eks ]; then
+  NODE_SELECTOR_YAML='nodeSelector: {ksc.dev/pool: sandbox}
+  tolerations: [{key: ksc.dev/sandbox, operator: Equal, value: "true", effect: NoSchedule}]'
+fi
 expected_nodes=$(( ${WORKERS:-2} + 1 ))
 
 check "nodes ready ($expected_nodes)" '[ "$(kubectl get nodes --no-headers | grep -c " Ready")" = '"$expected_nodes"' ]'
-check "calico-node on every node" '[ "$(kubectl -n kube-system get ds calico-node -o jsonpath={.status.numberReady})" = '"$expected_nodes"' ]'
+if kubectl -n kube-system get ds calico-node >/dev/null 2>&1; then
+  check "calico-node on every node" '[ "$(kubectl -n kube-system get ds calico-node -o jsonpath={.status.numberReady})" = '"$expected_nodes"' ]'
+else
+  check "VPC CNI network policy agent present (EKS)" 'kubectl -n kube-system get ds aws-node -o jsonpath={.spec.template.spec.containers[*].name} | grep -q aws-eks-nodeagent'
+fi
 check "sandboxes PSA enforce=restricted" '[ "$(kubectl get ns sandboxes -o jsonpath={.metadata.labels.pod-security\\.kubernetes\\.io/enforce})" = restricted ]'
 check "default-deny netpol in sandboxes" 'kubectl -n sandboxes get netpol default-deny-all'
 check "resourcequota in sandboxes" 'kubectl -n sandboxes get resourcequota sandbox-quota'
@@ -20,7 +30,7 @@ check "api deployment available" 'kubectl -n ksc-system rollout status deploy/ks
 
 # NetworkPolicy is really enforced: a compliant pod in sandboxes must not reach DNS or the API server.
 kubectl -n sandboxes delete pod nettest --ignore-not-found --wait >/dev/null 2>&1
-kubectl -n sandboxes apply -f - >/dev/null <<'YAML'
+kubectl -n sandboxes apply -f - >/dev/null <<YAML
 apiVersion: v1
 kind: Pod
 metadata: {name: nettest}
@@ -28,6 +38,7 @@ spec:
   serviceAccountName: sandbox
   automountServiceAccountToken: false
   restartPolicy: Never
+  ${NODE_SELECTOR_YAML}
   securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
   containers:
     - name: t
@@ -43,10 +54,10 @@ kubectl -n ksc-system delete pod nettest-ctl --ignore-not-found --wait >/dev/nul
 kubectl -n ksc-system run nettest-ctl --image=busybox:1.36 --restart=Never -- sleep 3600 >/dev/null 2>&1
 kubectl -n ksc-system wait --for=condition=Ready pod/nettest-ctl --timeout=120s >/dev/null 2>&1
 check "control: DNS works from ksc-system" 'kubectl -n ksc-system exec nettest-ctl -- nslookup -timeout=3 kubernetes.default.svc.cluster.local'
-check "control: postgres reachable from ksc-system" 'kubectl -n ksc-system exec nettest-ctl -- nc -w 3 -z ksc-postgres 5432'
+check "control: ksc-api reachable from ksc-system" 'kubectl -n ksc-system exec nettest-ctl -- nc -w 3 -z ksc-api 8080'
 check "sandbox pod cannot resolve DNS" '! kubectl -n sandboxes exec nettest -- nslookup -timeout=3 kubernetes.default.svc.cluster.local'
 check "sandbox pod cannot reach 1.1.1.1" '! kubectl -n sandboxes exec nettest -- wget -q -T 3 -O- http://1.1.1.1'
-check "sandbox pod cannot reach postgres" '! kubectl -n sandboxes exec nettest -- nc -w 3 -z ksc-postgres.ksc-system.svc 5432'
+check "sandbox pod cannot reach the trusted namespace" '! kubectl -n sandboxes exec nettest -- nc -w 3 -z ksc-api.ksc-system.svc 8080'
 kubectl -n ksc-system delete pod nettest-ctl --wait=false >/dev/null 2>&1
 kubectl -n sandboxes delete pod nettest --wait=false >/dev/null 2>&1
 [ "$FAIL" = 0 ] && echo "verify-cluster: PASS" || { echo "verify-cluster: FAIL"; exit 1; }

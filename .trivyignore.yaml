@@ -1,0 +1,25 @@
+# Findings that are deliberate trade-offs of an ephemeral, low-cost proof environment. Each one is also listed
+# under "Known limitations" in the README and explained in docs/AWS.md together with what a real deployment
+# would do instead. Nothing here is hidden: it is accepted on purpose and written down.
+misconfigurations:
+  - id: AWS-0132
+    statement: >-
+      The Terraform state bucket uses SSE-S3, not a customer-managed KMS key: a CMK costs about $1/month,
+      which alone is ten times the project's $0.10/month idle target. The bucket is private, versioned and TLS-only.
+  - id: AWS-0039
+    statement: >-
+      No KMS envelope encryption of Kubernetes Secrets on the session cluster: it would add a KMS key (cost) and the
+      cluster lives 1 to 4 hours and holds only a Neon test-database secret. A real deployment enables it.
+  - id: AWS-0040
+    statement: >-
+      The EKS public API endpoint is enabled on purpose, restricted to the CI runner's single /32 address for the session
+      (and the private endpoint is on for the nodes). Making it fully private would need a VPN or a runner inside the VPC.
+  - id: AWS-0104
+    statement: >-
+      The EKS module's node security group allows all egress: nodes must reach the internet to pull images and
+      join the cluster because there is no NAT gateway or VPC endpoints (each costs money). Inbound from the internet is
+      not allowed, and sandbox pods are additionally denied all egress by NetworkPolicy.
+  - id: AWS-0164
+    statement: >-
+      Public subnets assign public IPs to nodes by design (no NAT gateway, about $32/month each). Node security groups
+      allow no inbound traffic from the internet. A real deployment uses private nodes with NAT or VPC endpoints.

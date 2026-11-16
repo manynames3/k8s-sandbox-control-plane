@@ -10,10 +10,11 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import CursorResult, Engine
 from sqlalchemy.orm import Session
 
 from api import states
@@ -24,6 +25,7 @@ from dispatcher.kube import Kube, PodInfo
 log = logging.getLogger("ksc.dispatcher")
 CLAIM_LOCK_KEY = 0x6B7363_0001
 SWEEP_LOCK_KEY = 0x6B7363_0002
+RETENTION_LOCK_KEY = 0x6B7363_0003
 MAX_LOG_READ = 4 * 1024 * 1024  # raw bytes read from the log API (framing overhead included)
 MAX_STREAM = 1024 * 1024
 IMAGE_ERRORS = frozenset({"ErrImagePull", "ImagePullBackOff", "InvalidImageName",
@@ -281,6 +283,23 @@ def sweep(engine: Engine, kube: Kube, timing: Timing, now: datetime | None = Non
                 log.warning("sweeper deleted stale object",
                             extra={"run_id": o.run_id or "", "error": f"{o.kind}/{o.name}"})
     return deleted
+
+
+def prune_old_logs(engine: Engine, retention_days: float) -> int:
+    """Delete stdout/stderr chunk events of finished runs older than the retention period, so the
+    database stays inside a small free plan (Neon, ADR 3). Run records and state events are kept; the
+    final stdout/stderr stay on the run row. One replica at a time via a transaction-level lock."""
+    with Session(engine) as s, s.begin():
+        if not s.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": RETENTION_LOCK_KEY}).scalar():
+            return 0
+        res = cast("CursorResult[Any]", s.execute(text(
+            "DELETE FROM run_events e USING runs r WHERE e.run_id = r.id AND e.kind IN ('stdout','stderr') "
+            "AND r.finished_at IS NOT NULL AND e.ts < now() - make_interval(secs => :secs)"),
+            {"secs": retention_days * 86400}))
+        n = int(res.rowcount or 0)
+    if n:
+        log.info("pruned old log chunks", extra={"error": f"{n} events"})
+    return n
 
 
 _last_snapshot = 0.0
