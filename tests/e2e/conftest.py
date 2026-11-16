@@ -73,3 +73,15 @@ def assert_cleaned_up(run_id: str, timeout: float = 30) -> None:
             return
         time.sleep(0.5)
     pytest.fail(f"resources left for run {run_id}: {left}")
+
+
+def wait_status(client: httpx.Client, run_id: str, status: str, timeout: float = 60) -> dict:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        run = client.get(f"/v1/runs/{run_id}").json()
+        if run["status"] == status:
+            return run
+        if run["status"] in TERMINAL:
+            pytest.fail(f"run {run_id} reached {run['status']} while waiting for {status}")
+        time.sleep(0.3)
+    pytest.fail(f"run {run_id} never reached {status}")

@@ -48,3 +48,25 @@
 **Not verified:** timeout, OOM and non-zero exit paths on the real cluster (unit-tested via fake only).
 
 **Disk:** internal free 10 GB at end. The 15->9 GB drop was the Claude desktop app's own VM bundle (~9 GB) and a 596 MB `~/.remodex` log, not this project; project footprint on internal disk is ~350 MB of Homebrew CLIs.
+
+## Phase 3 — Timeouts, OOM, exit codes, cancel, infra errors, sweeper, reconcile, idempotency (2026-11-16, ~1 h)
+
+**Done:**
+- Terminal states reachable and classified: `succeeded`, `failed` (exit code + stderr kept), `timed_out` (wrapper exit 124; job-deadline backstop maps to `timed_out/deadline_exceeded`), `oom_killed`, `cancelled`, `infra_error` (pod deleted from outside, job lost, image pull errors > 30 s, Pending > 120 s).
+- `DELETE /v1/runs/{id}` cancels (queued/dispatching/running); terminal runs are a no-op; other keys get 404.
+- Reconcile (every tick): live run without a Job is re-queued if it never started, else `infra_error/job_lost`; cluster objects whose run is missing or terminal are deleted. Objects without a run-id label are left to the sweeper.
+- Sweeper (every 30 s, one replica via `pg_try_advisory_xact_lock`): deletes managed Job/Pod/ConfigMap older than min(timeout + 300 s, 600 s), unlabelled objects after 600 s; counts deletions in `dispatcher/metrics.py`.
+- Idempotency verified end to end (same key, same run, one execution).
+
+**Verified how:** `make test` 57 passed; ruff + mypy clean; `make e2e` 10 passed (hello, non-zero exit, exception, stdin, infinite loop times out within timeout + 8 s (not at the 33 s backstop), 2 GiB allocation -> `oom_killed`, cancel mid-run, Job deleted mid-run -> `infra_error`, idempotency, hand-made orphan Job + ConfigMap removed by the sweeper, confirmed via the "sweeper deleted stale object" log). Every terminal state is followed by the cleanup proof (Job, Pod, ConfigMap gone within 30 s). `make verify-cluster` still PASS; `sandboxes` ends empty.
+
+**Found and fixed on the way:** a Job deleted mid-run was first classified `failed` (the pod exits 143 while being deleted); now `infra_error/pod_deleted` via `deletionTimestamp`. An old unit test encoded DeadlineExceeded as infra_error; corrected to timed_out.
+
+**Deviations from the handoff (flagged):**
+- Dispatcher RBAC gained `list` on configmaps and `delete` on pods (needed to find orphan ConfigMaps and delete orphan pods without a Job). Still namespaced, no secrets.
+- Metrics are in-process counters (logged), not yet exported to Prometheus (phase 6).
+- Reconcile runs every tick, not every 30 s, so cancel cleanup is prompt; cost is three list calls per second at this scale.
+
+**Caveats:** the orphan e2e test temporarily sets sweeper env on the live dispatcher (restores afterwards; must not run concurrently with other e2e tests). Layer-2 (`activeDeadlineSeconds`) is only unit-tested via fakes, since the wrapper always fires first. Per-key rate limit and concurrency cap are still not enforced. Cancelling a queued run is unit-tested only.
+
+**Next:** phase 4: admission policy (ValidatingAdmissionPolicy), attack suite, chaos tests, `ci.yml`, GitHub repo (public) and a real CI run.

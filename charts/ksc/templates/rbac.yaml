@@ -34,13 +34,13 @@ rules:
     verbs: ["create", "get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "delete"]   # delete: sweeper removes orphan pods without a Job
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: [""]
     resources: ["configmaps"]
-    verbs: ["create", "get", "delete"]
+    verbs: ["create", "get", "list", "delete"]   # list: reconcile and sweeper find orphans
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list"]

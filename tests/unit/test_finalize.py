@@ -50,7 +50,8 @@ def get(engine, rid):
     (1, "Error", frame("err", b"boom"), "failed"),
     (124, "Error", frame("meta", timeout=True), "timed_out"),
     (137, "OOMKilled", "", "oom_killed"),
-    (None, "DeadlineExceeded", "", "infra_error"),
+    (None, "DeadlineExceeded", "", "timed_out"),  # layer 2: job deadline fired before the wrapper
+    (None, "Evicted", "", "infra_error"),
 ])
 def test_classification_and_cleanup(db, exit_code, reason, logs, expected):
     rid = make_run(db)
@@ -79,3 +80,20 @@ def test_terminal_state_is_never_overwritten(db):
     core.finalize(db, kube, rid, pod(rid, 0, "Completed"))
     assert get(db, rid).status == "cancelled" and get(db, rid).stdout == ""
     assert kube.deleted == [rid]  # still cleaned up
+
+
+def test_pod_deleted_from_outside_is_infra_error_not_user_failure(db):
+    rid = make_run(db)
+    p = pod(rid, 143, "Error", "Failed")
+    p.deleting = True
+    core.finalize(db, FakeKube(""), rid, p)
+    run = get(db, rid)
+    assert run.status == "infra_error" and run.termination_reason == "pod_deleted"
+
+
+def test_pod_that_finished_cleanly_is_not_misclassified_by_deletion(db):
+    rid = make_run(db)
+    p = pod(rid, 0, "Completed", "Succeeded")
+    p.deleting = True
+    core.finalize(db, FakeKube(""), rid, p)
+    assert get(db, rid).status == "succeeded"

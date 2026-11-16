@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from sqlalchemy import select, text
@@ -6,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from api import states
 from api.auth import require_key
 from api.db import get_engine
 from api.models import Run, RunEvent
@@ -77,3 +79,18 @@ def get_run(run_id: uuid.UUID, key_id: uuid.UUID = Depends(require_key)) -> Run:
         if run is None or run.api_key_id != key_id:
             raise HTTPException(404, "run not found")
         return run
+
+
+@app.delete("/v1/runs/{run_id}", response_model=RunOut)
+def cancel_run(run_id: uuid.UUID, key_id: uuid.UUID = Depends(require_key)) -> Run:
+    """Marks the run cancelled. The dispatcher removes its cluster objects on its next tick."""
+    with Session(get_engine(), expire_on_commit=False) as s, s.begin():
+        run = s.scalar(select(Run).where(Run.id == run_id).with_for_update())
+        if run is None or run.api_key_id != key_id:
+            raise HTTPException(404, "run not found")
+        if states.can_transition(run.status, "cancelled"):
+            run.status = "cancelled"
+            run.termination_reason = "cancelled"
+            run.finished_at = datetime.now(UTC)
+            s.add(RunEvent(run_id=run.id, kind="state", data={"status": "cancelled"}))
+        return run  # already terminal: cancelling again is a no-op

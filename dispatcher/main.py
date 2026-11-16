@@ -3,6 +3,7 @@ import logging
 import os
 import signal
 import time
+from datetime import UTC, datetime
 
 from api.db import get_engine
 from dispatcher import core, podspec
@@ -28,7 +29,13 @@ def main() -> None:
         namespace=ns,
         images={"python3.12": os.environ.get("RUNNER_IMAGE_PYTHON", "ksc/runner-python:dev")},
     )
+    timing = core.Timing(
+        sweep_max_age=float(os.environ.get("SWEEP_MAX_AGE_SECONDS", "600")),
+        sweep_grace=float(os.environ.get("SWEEP_GRACE_SECONDS", "300")),
+        sweep_interval=float(os.environ.get("SWEEP_INTERVAL_SECONDS", "30")),
+    )
     engine, kube = get_engine(), RealKube(ns)
+    last_sweep = datetime.min.replace(tzinfo=UTC)
     stop = False
 
     def _stop(*_: object) -> None:
@@ -40,7 +47,10 @@ def main() -> None:
     logging.getLogger("ksc.dispatcher").info("dispatcher started")
     while not stop:
         try:
-            core.tick(engine, kube, cap, sandbox)
+            core.tick(engine, kube, cap, sandbox, timing)
+            if (datetime.now(UTC) - last_sweep).total_seconds() >= timing.sweep_interval:
+                last_sweep = datetime.now(UTC)
+                core.sweep(engine, kube, timing)
         except Exception:
             logging.getLogger("ksc.dispatcher").exception("tick failed")
         time.sleep(1)
