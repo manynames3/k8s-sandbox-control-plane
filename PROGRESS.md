@@ -157,3 +157,10 @@ state bucket `ksc-tfstate-<account>-us-east-1` (versioned, encrypted, public acc
 Repo variables `AWS_ROLE_ARN` and `TF_STATE_BUCKET` set. Bootstrap state is local (git-ignored) in `infra/bootstrap/`: keep it.
 No EKS session has been started; creating the cluster remains a manual, approved workflow run. Still to do (owner): Neon secrets,
 the `eks-session` environment with a required reviewer, public GHCR packages.
+
+## First real AWS contact: reaper failed, fixed (2026-11-17)
+The hourly `aws-reaper` could not assume `ksc-ci`: this repo uses GitHub's immutable OIDC subject
+(`repo:manynames3@<owner id>/k8s-sandbox-control-plane@<repo id>:...`), so the classic trust condition never matched. Added the
+`github_sub_prefix` variable to `infra/bootstrap`, applied the one in-place change to the role's trust policy, and re-ran the
+reaper by hand: success. That run also exercised `aws_orphans.sh expired` and `deep` against real AWS for the first time (no resources
+found, no AccessDenied), which is the first evidence the check calls and the role's read permissions are accepted by AWS.

@@ -14,6 +14,16 @@ variable "github_repo" {
   default     = "manynames3/k8s-sandbox-control-plane"
 }
 
+variable "github_sub_prefix" {
+  description = <<-EOT
+    Prefix of the OIDC `sub` claim GitHub puts in tokens for this repository. Null means the classic "repo:owner/name".
+    Repositories that use GitHub's immutable subject claim (owner and repository ids in the subject) need the value
+    from: gh api repos/OWNER/NAME/actions/oidc/customization/sub  (the sub_claim_prefix field).
+  EOT
+  type        = string
+  default     = null
+}
+
 variable "github_environment" {
   description = "GitHub Environment the session workflow runs in (it requires the owner's approval)."
   type        = string

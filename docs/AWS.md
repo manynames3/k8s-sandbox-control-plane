@@ -34,7 +34,11 @@ cannot show:
    terraform plan  -var owner_email=you@example.com      # read the plan
    terraform apply -var owner_email=you@example.com
    ```
-   If the account already has the GitHub OIDC provider, add `-var create_oidc_provider=false`. Note the outputs
+   If the account already has the GitHub OIDC provider, add `-var create_oidc_provider=false`. If the repository uses GitHub's
+   immutable OIDC subject (owner and repository ids inside the `sub` claim; check with
+   `gh api repos/OWNER/NAME/actions/oidc/customization/sub`), also pass
+   `-var "github_sub_prefix=$(gh api repos/OWNER/NAME/actions/oidc/customization/sub -q .sub_claim_prefix)"`, otherwise every
+   workflow fails with "Not authorized to perform sts:AssumeRoleWithWebIdentity" (this happened on the first reaper run). Note the outputs
    `state_bucket` and `ci_role_arn`. Bootstrap state is local and git-ignored: keep it.
 3. **GitHub repository variables:** `AWS_ROLE_ARN` = `ci_role_arn`, `TF_STATE_BUCKET` = `state_bucket`.
 4. **GitHub repository secrets (Neon):** create a Neon project, then add

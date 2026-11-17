@@ -18,6 +18,7 @@ locals {
   account_id  = data.aws_caller_identity.current.account_id
   bucket_name = "ksc-tfstate-${local.account_id}-${var.region}"
   oidc_host   = "token.actions.githubusercontent.com"
+  sub_prefix  = coalesce(var.github_sub_prefix, "repo:${var.github_repo}")
   role_prefix = "arn:${data.aws_partition.current.partition}:iam::${local.account_id}:role/${var.cluster_name}"
 }
 
@@ -129,8 +130,8 @@ data "aws_iam_policy_document" "trust" {
       test     = "StringEquals"
       variable = "${local.oidc_host}:sub"
       values = [
-        "repo:${var.github_repo}:environment:${var.github_environment}",
-        "repo:${var.github_repo}:ref:refs/heads/main",
+        "${local.sub_prefix}:environment:${var.github_environment}",
+        "${local.sub_prefix}:ref:refs/heads/main",
       ]
     }
   }
