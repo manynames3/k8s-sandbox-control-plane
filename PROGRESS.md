@@ -164,3 +164,10 @@ The hourly `aws-reaper` could not assume `ksc-ci`: this repo uses GitHub's immut
 `github_sub_prefix` variable to `infra/bootstrap`, applied the one in-place change to the role's trust policy, and re-ran the
 reaper by hand: success. That run also exercised `aws_orphans.sh expired` and `deep` against real AWS for the first time (no resources
 found, no AccessDenied), which is the first evidence the check calls and the role's read permissions are accepted by AWS.
+
+## Pre-session setup done (2026-11-17)
+- Neon project `ksc-sessions` (us-east-1, PG 17) created; secrets `NEON_DATABASE_URL` (pooled, psycopg form) and `NEON_DATABASE_URL_DIRECT` set. Both URLs connect (pooled with `prepare_threshold=None`).
+- GitHub environment `eks-session`: required reviewer = owner, deployment branches limited to `main`, self-review allowed (single-person repo).
+- `images.yml` now builds on every push to `main` (the session pulls `sha-<commit>`; a docs-only commit used to leave no images for HEAD).
+- GHCR packages were already anonymously pullable (inherited from the public repo), checked for the HEAD sha tag.
+- `make aws-plan` against the real state bucket: 48 to add, 0 to change, 0 to destroy; no NAT, load balancer, KMS, EIP, log group, RDS or Auto Mode in it. Nothing applied.
