@@ -4,14 +4,9 @@ name: images
 # Packages > package settings > Change visibility), otherwise EKS nodes cannot pull them anonymously.
 on:
   push:
+    # Every push to main, not only image changes: the EKS session pulls images tagged with the exact commit it runs on
+    # (sha-<commit>), so each commit needs them. Unchanged layers come from the cache, so this is cheap.
     branches: [main]
-    paths:
-      - Dockerfile.api
-      - runner/**
-      - api/**
-      - dispatcher/**
-      - pyproject.toml
-      - .github/workflows/images.yml
   workflow_dispatch:
 permissions:
   contents: read
